@@ -1,0 +1,293 @@
+"""REST Client for ResMed myAir Client."""
+
+import datetime as dt
+import logging
+from collections.abc import Mapping, MutableMapping
+from typing import Any
+
+from aiohttp import ClientSession
+
+from ..models import MyAirDevice, MyAirSleepRecord
+from ..redaction import redact_dict
+from .auth import MyAirAuthSession
+from .graphql import MyAirGraphQLClient
+from .myair_client import MyAirClient, MyAirConfig, ParsingError, StaleSessionError
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+def _required_mapping(value: Any, message: str) -> Mapping[str, Any]:
+    """Validate that a decoded GraphQL payload member is a mapping.
+
+    Args:
+        value (Any): Payload member to validate.
+        message (str): Parsing error message to raise when validation fails.
+
+    Returns:
+        Mapping[str, Any]: The validated payload member.
+
+    Raises:
+        ParsingError: When the payload member is not a mapping.
+    """
+    if not isinstance(value, Mapping):
+        raise ParsingError(message)
+    return value
+
+
+def _required_session_mapping(value: Any, message: str) -> Mapping[str, Any]:
+    """Validate a required mapping and mark an absent member as a stale session.
+
+    Args:
+        value (Any): Required response member to validate.
+        message (str): Parsing error message raised for an invalid member.
+
+    Returns:
+        Mapping[str, Any]: The validated response member.
+
+    Raises:
+        StaleSessionError: When the required response member is absent.
+        ParsingError: When the response member is present but malformed.
+    """
+    if value is None:
+        raise StaleSessionError(message)
+    if not isinstance(value, Mapping):
+        raise ParsingError(message)
+    return value
+
+
+def _required_session_list(value: Any, message: str) -> list[Any]:
+    """Validate a required list and mark an absent member as a stale session.
+
+    Args:
+        value (Any): Required response member to validate.
+        message (str): Parsing error message raised for an invalid member.
+
+    Returns:
+        list[Any]: The validated response member.
+
+    Raises:
+        StaleSessionError: When the required response member is absent.
+        ParsingError: When the response member is present but malformed.
+    """
+    if value is None:
+        raise StaleSessionError(message)
+    if not isinstance(value, list):
+        raise ParsingError(message)
+    return value
+
+
+def _optional_mask_code(patient_wrapper: Mapping[str, Any]) -> str | None:
+    """Extract a mask code from optional myAir mask metadata.
+
+    Args:
+        patient_wrapper (Mapping[str, Any]): Decoded ``getPatientWrapper`` GraphQL payload.
+
+    Returns:
+        str | None: First non-empty mask code, or ``None`` when metadata is absent
+            or malformed.
+    """
+    masks = patient_wrapper.get("masks")
+    if not isinstance(masks, list) or not masks:
+        _LOGGER.warning("Error getting User Mask Data. Missing or invalid masks payload")
+        return None
+
+    found_malformed_mask = False
+    for mask in masks:
+        if not isinstance(mask, Mapping):
+            found_malformed_mask = True
+            continue
+        if "maskCode" not in mask:
+            found_malformed_mask = True
+            continue
+
+        mask_code = mask.get("maskCode")
+        if isinstance(mask_code, str):
+            if mask_code:
+                return mask_code
+            continue
+
+        found_malformed_mask = True
+
+    if found_malformed_mask:
+        _LOGGER.warning("Error getting User Mask Data. No valid maskCode found")
+    return None
+
+
+class RESTClient(MyAirClient):
+    """Coordinate myAir authentication and AppSync GraphQL data access."""
+
+    def __init__(self, config: MyAirConfig, session: ClientSession) -> None:
+        """Create auth and GraphQL helpers around a shared aiohttp session.
+
+        Args:
+            config (MyAirConfig): User credentials, region, and remembered-device token.
+            session (ClientSession): Home Assistant-managed aiohttp session.
+        """
+        _LOGGER.debug("[RESTClient init] config: %s", redact_dict(config._asdict()))
+        self._config: MyAirConfig = config
+        self._session: ClientSession = session
+        self._auth = MyAirAuthSession(config, session)
+        self._graphql = MyAirGraphQLClient(
+            session=self._session,
+            auth=self._auth,
+            region_config=self._auth.region_config,
+        )
+
+    @property
+    def device_token(self) -> str | None:
+        """Expose the remembered-device token that should be saved in config entries."""
+        return self._auth.device_token
+
+    async def connect(self, initial: bool | None = False, *, force: bool = False) -> str:
+        """Authenticate with myAir or reuse an active OAuth token.
+
+        Args:
+            initial (bool | None): Whether the call is part of config setup, where MFA can be
+                triggered and surfaced to the user.
+            force (bool): Whether to bypass cached-token validation and authenticate
+                again.
+
+        Returns:
+            str: Okta authentication status.
+        """
+        return await self._auth.connect(initial=initial, force=force)
+
+    async def verify_mfa_and_get_access_token(self, verification_code: str) -> str:
+        """Complete an MFA challenge and cache OAuth tokens.
+
+        Args:
+            verification_code (str): Email MFA code supplied by the user.
+
+        Returns:
+            str: Okta authentication status after MFA verification.
+        """
+        return await self._auth.verify_mfa_and_get_access_token(verification_code)
+
+    async def is_email_verified(self) -> bool:
+        """Return whether Okta userinfo reports a verified email address.
+
+        Returns:
+            bool: ``True`` when the account email is verified.
+        """
+        return await self._auth.is_email_verified()
+
+    async def _gql_query(self, operation_name: str, query: str, initial: bool | None = False) -> dict[str, Any]:
+        """Execute a myAir AppSync operation with the current auth state.
+
+        Args:
+            operation_name (str): GraphQL operation name sent to AppSync.
+            query (str): GraphQL document to execute.
+            initial (bool | None): Whether the query is part of config setup.
+
+        Returns:
+            dict[str, Any]: Decoded GraphQL response payload.
+        """
+        return await self._graphql.query(operation_name, query, initial=bool(initial))
+
+    async def get_sleep_records(self, initial: bool = False) -> list[MyAirSleepRecord]:
+        """Fetch and normalize the recent nightly sleep records.
+
+        Args:
+            initial (bool): Whether this fetch is part of config setup.
+
+        Returns:
+            list[MyAirSleepRecord]: Typed records returned by myAir for the last 30 days.
+
+        Raises:
+            ParsingError: When the GraphQL response omits or malforms sleep record data.
+        """
+        today_date: dt.date = dt.datetime.now(dt.UTC).astimezone().date()
+        today: str = today_date.isoformat()
+        one_month_ago: str = (today_date - dt.timedelta(days=30)).isoformat()
+
+        query: str = """query GetPatientSleepRecords {
+            getPatientWrapper {
+                patient {
+                    firstName
+                }
+                sleepRecords(startMonth: \"ONE_MONTH_AGO\", endMonth: \"DATE\")
+                {
+                    items {
+                        startDate
+                        totalUsage
+                        sleepScore
+                        usageScore
+                        ahiScore
+                        maskScore
+                        leakScore
+                        ahi
+                        maskPairCount
+                        leakPercentile
+                        sleepRecordPatientId
+                        __typename
+                    }
+                    __typename
+                }
+            __typename
+            }
+        }
+        """.replace("ONE_MONTH_AGO", one_month_ago).replace("DATE", today)
+
+        _LOGGER.info("Getting Sleep Records")
+        records_dict: MutableMapping[str, Any] = await self._gql_query("GetPatientSleepRecords", query, initial)
+        _LOGGER.debug("[get_sleep_records] records_dict: %s", redact_dict(records_dict))
+        data = _required_session_mapping(records_dict.get("data"), "Error getting Patient Sleep Records")
+        patient_wrapper = _required_session_mapping(data.get("getPatientWrapper"), "Error getting Patient Sleep Records")
+        sleep_records = _required_session_mapping(patient_wrapper.get("sleepRecords"), "Error getting Patient Sleep Records")
+        records = _required_session_list(
+            sleep_records.get("items"),
+            "Error getting Patient Sleep Records. Returned records is not a list",
+        )
+        _LOGGER.debug("[get_sleep_records] records: %s", redact_dict(records))
+        typed_records: list[MyAirSleepRecord] = []
+        for record in records:
+            if not isinstance(record, Mapping):
+                _LOGGER.error("Error getting Patient Sleep Records. Returned record item is not a mapping")
+                raise ParsingError("Error getting Patient Sleep Records. Returned record item is not a mapping")
+            typed_records.append(MyAirSleepRecord.from_api(record))
+        return typed_records
+
+    async def get_user_device_data(self, initial: bool = False) -> MyAirDevice:
+        """Fetch and normalize the account's assigned flow-generator device.
+
+        Args:
+            initial (bool): Whether this fetch is part of config setup.
+
+        Returns:
+            MyAirDevice: Device data enriched with the first mask code when available.
+
+        Raises:
+            ParsingError: When the GraphQL response omits or malforms device data.
+        """
+        query: str = """
+        query getPatientWrapper {
+            getPatientWrapper {
+                masks {
+                    maskCode
+                }
+                fgDevices {
+                    serialNumber
+                    localizedName
+                    deviceSeries
+                    deviceFamily
+                    lastSleepDataReportTime
+                    fgDeviceManufacturerName
+                    fgDevicePatientId
+                }
+            }
+        }
+        """
+
+        _LOGGER.info("Getting User Device Data")
+        records_dict: MutableMapping[str, Any] = await self._gql_query("getPatientWrapper", query, initial)
+        _LOGGER.debug("[get_user_device_data] records_dict: %s", redact_dict(records_dict))
+        data = _required_session_mapping(records_dict.get("data"), "Error getting User Device Data")
+        patient_wrapper = _required_session_mapping(data.get("getPatientWrapper"), "Error getting User Device Data")
+        devices = _required_session_list(patient_wrapper.get("fgDevices"), "Error getting User Device Data")
+        if not devices:
+            raise ParsingError("Error getting User Device Data")
+        device = dict(_required_mapping(devices[0], "Error getting User Device Data. Returned data is not a dict"))
+        if mask_code := _optional_mask_code(patient_wrapper):
+            device["maskCode"] = mask_code
+        _LOGGER.debug("[get_user_device_data] device: %s", redact_dict(device))
+        return MyAirDevice.from_api(device)

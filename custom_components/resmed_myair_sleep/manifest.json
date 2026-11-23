@@ -1,0 +1,13 @@
+{
+  "domain": "resmed_myair_sleep",
+  "name": "ResMed myAir Sleep",
+  "codeowners": ["@jesmak"],
+  "config_flow": true,
+  "dependencies": ["recorder"],
+  "documentation": "https://github.com/jesmak/resmed_myair_sleep",
+  "integration_type": "device",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/jesmak/resmed_myair_sleep/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}
