@@ -1,0 +1,59 @@
+{
+  "entity": {
+    "sensor": {
+      "night": {
+        "default": "mdi:calendar-blank"
+      },
+      "start": {
+        "default": "mdi:weather-night"
+      },
+      "end": {
+        "default": "mdi:weather-sunset-up"
+      },
+      "usage": {
+        "default": "mdi:timer-outline"
+      },
+      "ahi": {
+        "default": "mdi:lungs"
+      },
+      "leak": {
+        "default": "mdi:face-mask"
+      },
+      "mask_pairs": {
+        "default": "mdi:face-mask-outline"
+      },
+      "score": {
+        "default": "mdi:star-outline"
+      },
+      "usage_score": {
+        "default": "mdi:star-outline"
+      },
+      "ahi_score": {
+        "default": "mdi:star-outline"
+      },
+      "mask_score": {
+        "default": "mdi:star-outline"
+      },
+      "leak_score": {
+        "default": "mdi:star-outline"
+      },
+      "temperature_min": {
+        "default": "mdi:thermometer-chevron-down"
+      },
+      "temperature_max": {
+        "default": "mdi:thermometer-chevron-up"
+      },
+      "compliance": {
+        "default": "mdi:calendar-check"
+      },
+      "last_upload": {
+        "default": "mdi:cloud-upload-outline"
+      }
+    }
+  },
+  "services": {
+    "import_nights": {
+      "service": "mdi:database-import"
+    }
+  }
+}

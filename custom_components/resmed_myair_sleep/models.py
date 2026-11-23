@@ -42,22 +42,6 @@ def _to_usage_minutes(raw_usage: Any) -> int | None:
     return None
 
 
-def _format_usage_time(total_usage_minutes: int | None) -> str | None:
-    """Render usage minutes in the text format users expect in HA.
-
-    Args:
-        total_usage_minutes (int | None): Normalized CPAP usage minutes.
-
-    Returns:
-        str | None: ``H:MM`` text, or ``None`` when usage is unavailable.
-    """
-    if total_usage_minutes is None:
-        return None
-
-    clamped_minutes = max(total_usage_minutes, 0)
-    return f"{clamped_minutes // 60}:{clamped_minutes % 60:02}"
-
-
 def _to_optional_str(raw: Any) -> str | None:
     """Keep string API fields while discarding unexpected payload types.
 
@@ -97,7 +81,6 @@ class MyAirDevice:
     raw: dict[str, Any]
     serial_number: str
     manufacturer: str | None
-    model: str | None
     name: str | None
 
     @classmethod
@@ -109,8 +92,7 @@ class MyAirDevice:
                 ``None`` when the API omitted it.
 
         Returns:
-            Self: Typed device with normalized serial, manufacturer, model, and
-                name fields.
+            Self: Typed device with normalized serial, manufacturer and name fields.
         """
         raw = dict(data or {})
         serial_number = raw.get("serialNumber", "")
@@ -120,31 +102,17 @@ class MyAirDevice:
             raw=raw,
             serial_number=serial_number,
             manufacturer=_to_optional_str(raw.get("fgDeviceManufacturerName")),
-            model=_to_optional_str(raw.get("deviceType")),
             name=_to_optional_str(raw.get("localizedName")),
         )
-
-    def native_value(self, key: str) -> Any | None:
-        """Read a sensor value from the original device payload.
-
-        Args:
-            key (str): GraphQL field name used by the sensor description.
-
-        Returns:
-            Any | None: Raw payload value, or ``None`` when the key is absent.
-        """
-        return self.raw.get(key)
 
 
 @dataclass(frozen=True, slots=True)
 class MyAirSleepRecord:
-    """Typed view of a nightly sleep record and its derived usage fields."""
+    """Typed view of a nightly sleep record and its normalized usage."""
 
     raw: dict[str, Any]
     start_date: date | None
     total_usage_minutes: int | None
-    friendly_usage_time: str | None
-    has_usage: bool
 
     @classmethod
     def from_api(cls, data: Mapping[str, Any] | None) -> Self:
@@ -155,62 +123,12 @@ class MyAirSleepRecord:
                 ``None`` when unavailable.
 
         Returns:
-            Self: Typed record with parsed date, normalized minutes, and friendly
-                usage text.
+            Self: Typed record with parsed date and normalized minutes.
         """
         raw = dict(data or {})
         total_usage_minutes = _to_usage_minutes(raw.get("totalUsage"))
-        has_usage = total_usage_minutes is not None and total_usage_minutes > 0
         return cls(
             raw=raw,
             start_date=_to_optional_date(raw.get("startDate")),
             total_usage_minutes=total_usage_minutes,
-            friendly_usage_time=_format_usage_time(total_usage_minutes),
-            has_usage=has_usage,
-        )
-
-    def native_value(self, key: str) -> Any | None:
-        """Read a sensor value from the original sleep-record payload.
-
-        Args:
-            key (str): GraphQL field name used by the sensor description.
-
-        Returns:
-            Any | None: Raw payload value, or ``None`` when the key is absent.
-        """
-        return self.raw.get(key)
-
-
-@dataclass(frozen=True, slots=True)
-class MyAirCoordinatorData:
-    """Immutable snapshot of the latest myAir device and sleep data."""
-
-    device: MyAirDevice | None = None
-    sleep_records: tuple[MyAirSleepRecord, ...] = ()
-
-    @property
-    def latest_sleep_record(self) -> MyAirSleepRecord | None:
-        """Select the newest sleep record by start date.
-
-        Returns:
-            MyAirSleepRecord | None: Most recent record, or ``None`` when the
-                coordinator has no records.
-        """
-        return max(
-            self.sleep_records,
-            key=lambda record: record.start_date or date.min,
-            default=None,
-        )
-
-    @property
-    def most_recent_sleep_date(self) -> date | None:
-        """Find the newest sleep date with non-zero CPAP usage.
-
-        Returns:
-            date | None: Date of the most recent usage-bearing record, or ``None``
-                if none qualify.
-        """
-        return max(
-            (record.start_date for record in self.sleep_records if record.start_date and record.has_usage),
-            default=None,
         )

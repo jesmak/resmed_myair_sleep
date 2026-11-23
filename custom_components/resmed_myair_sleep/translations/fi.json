@@ -1,0 +1,150 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Kirjaudu myAiriin",
+        "description": "Käytä tiliä, jolla kirjaudut myAir-sovellukseen.",
+        "data": {
+          "username": "Sähköposti",
+          "password": "Salasana",
+          "region": "Alue"
+        },
+        "data_description": {
+          "region": "Eurooppa osoitteessa {eu_site} tehdyille tileille, Pohjois-Amerikka osoitteessa {na_site} tehdyille."
+        }
+      },
+      "verify_mfa": {
+        "title": "Vahvistuskoodi",
+        "description": "Anna koodi, jonka ResMed lähetti sähköpostiisi.",
+        "data": {
+          "verification_code": "Koodi"
+        }
+      },
+      "sensors": {
+        "title": "Makuuhuoneen anturit",
+        "description": "Vapaaehtoinen. Makuuhuoneen lämpötilasta ja ilmankosteudesta lasketaan keskiarvo jokaisen yön unijaksolta, ja se tallennetaan yön tietoihin.",
+        "data": {
+          "temperature_entity": "Lämpötila",
+          "humidity_entity": "Ilmankosteus"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Kirjaudu myAiriin uudelleen",
+        "description": "myAir ei enää hyväksy tilin {username} kirjautumista. Kirjaudu uudelleen antamalla salasana.",
+        "data": {
+          "password": "Salasana"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "myAir ei hyväksynyt sähköpostia tai salasanaa.",
+      "invalid_code": "myAir ei hyväksynyt koodia. Tarkista se ja yritä uudelleen.",
+      "incomplete_account": "Tilin käyttöönotto on kesken myAir-sovelluksessa, tai tilillä ei ole laitetta.",
+      "cannot_connect": "myAiriin ei saatu yhteyttä. Yritä hetken päästä uudelleen."
+    },
+    "abort": {
+      "already_configured": "Tämä laite on jo lisätty.",
+      "reauth_successful": "Kirjauduttiin myAiriin uudelleen.",
+      "wrong_account": "Tili kuuluu eri laitteelle kuin tämä merkintä."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Makuuhuoneen anturit",
+        "description": "Makuuhuoneen lämpötilasta ja ilmankosteudesta lasketaan keskiarvo jokaisen yön unijaksolta, ja se tallennetaan yön tietoihin. Muutos koskee tulevia öitä.",
+        "data": {
+          "temperature_entity": "Lämpötila",
+          "humidity_entity": "Ilmankosteus"
+        }
+      }
+    }
+  },
+  "selector": {
+    "region": {
+      "options": {
+        "eu": "Eurooppa",
+        "na": "Pohjois-Amerikka"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "night": {
+        "name": "Yö"
+      },
+      "start": {
+        "name": "Unijakson alku"
+      },
+      "end": {
+        "name": "Unijakson loppu"
+      },
+      "usage": {
+        "name": "Käyttöaika"
+      },
+      "ahi": {
+        "name": "AHI"
+      },
+      "leak": {
+        "name": "Maskin vuoto"
+      },
+      "mask_pairs": {
+        "name": "Maskin irrotukset"
+      },
+      "score": {
+        "name": "Unipisteet"
+      },
+      "usage_score": {
+        "name": "Käyttöpisteet"
+      },
+      "ahi_score": {
+        "name": "AHI-pisteet"
+      },
+      "mask_score": {
+        "name": "Maskipisteet"
+      },
+      "leak_score": {
+        "name": "Vuotopisteet"
+      },
+      "temperature": {
+        "name": "Lämpötila"
+      },
+      "temperature_min": {
+        "name": "Alin lämpötila"
+      },
+      "temperature_max": {
+        "name": "Ylin lämpötila"
+      },
+      "humidity": {
+        "name": "Ilmankosteus"
+      },
+      "compliance": {
+        "name": "Hoitoon sitoutuminen, 30 päivää"
+      },
+      "last_upload": {
+        "name": "Viimeisin tiedonsiirto"
+      }
+    }
+  },
+  "services": {
+    "import_nights": {
+      "name": "Tuo öitä",
+      "description": "Lisää muualla säilytettyjä öitä tallennettujen joukkoon. Jo tallennettua arvoa ei koskaan korvata.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Laite",
+          "description": "Merkintä, jolle yöt kuuluvat."
+        },
+        "nights": {
+          "name": "Yöt",
+          "description": "Lista öitä, joista jokaisella on päivämäärä ja mitkä tahansa tallennetun yön kentistä."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "entry_not_loaded": {
+      "message": "Tunnuksella ei löydy ladattua ResMed myAir Sleep -merkintää."
+    }
+  }
+}

@@ -1,0 +1,11 @@
+import_nights:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: resmed_myair_sleep
+    nights:
+      required: true
+      selector:
+        object:

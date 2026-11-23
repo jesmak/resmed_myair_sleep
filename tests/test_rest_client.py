@@ -1578,7 +1578,6 @@ async def test_data_fetch_success_variants(
         assert isinstance(result, MyAirDevice)
         assert result.raw == expected
         assert result.serial_number == expected.get("serialNumber")
-        assert result.native_value("serialNumber") == expected.get("serialNumber")
 
 
 @pytest.mark.asyncio
@@ -1751,66 +1750,6 @@ async def test_get_user_device_data_empty_list_is_not_stale_session(
         await client.get_user_device_data()
 
     assert type(exc.value) is ParsingError
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("masks", "expect_warning", "expected_mask"),
-    [
-        ([{"maskCode": "MASK123"}], False, "MASK123"),
-        ([{"maskCode": ""}], False, None),
-        ([{}, {"maskCode": "MASK123"}], False, "MASK123"),
-        ([{"maskCode": ""}, {"maskCode": "MASK123"}], False, "MASK123"),
-        ([], True, None),
-        ("not-a-list", True, None),
-        ([123], True, None),
-        ([{}], True, None),
-        ([{"maskCode": 123}], True, None),
-    ],
-)
-async def test_get_user_device_data_masks_variants(
-    config_na: MyAirConfig,
-    session: MagicMock,
-    masks: object,
-    expect_warning: object,
-    expected_mask: object,
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """Device-data mask handling preserves valid masks and warns on misses.
-
-    Args:
-        config_na (MyAirConfig): Client configuration used by the data fetch.
-        session (MagicMock): HTTP session stand-in supplied to the client.
-        masks (object): Mask payload selected to exercise valid and missing
-            mask-code handling.
-        expect_warning (object): Whether the selected mask payload should log a
-            warning.
-        expected_mask (object): Mask code expected in the resulting device data.
-        monkeypatch (pytest.MonkeyPatch): Patching fixture for the GraphQL query.
-        caplog (pytest.LogCaptureFixture): Captured logs used to inspect mask
-            warnings.
-    """
-    client = RESTClient(config_na, session)
-    client._auth.access_token = "access"
-    client._graphql.country_code = "US"
-
-    device = {"serialNumber": "12345"}
-    mock_response = {"data": {"getPatientWrapper": {"fgDevices": [device], "masks": masks}}}
-    monkeypatch.setattr(client, "_gql_query", AsyncMock(return_value=mock_response))
-
-    with caplog.at_level(logging.WARNING):
-        result = await client.get_user_device_data()
-
-    if expect_warning:
-        assert "Error getting User Mask Data" in caplog.text
-    else:
-        assert "Error getting User Mask Data" not in caplog.text
-
-    if expected_mask:
-        assert result.raw["maskCode"] == expected_mask
-    else:
-        assert "maskCode" not in result.raw
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,150 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sign in to myAir",
+        "description": "Use the account you sign in to the myAir app with.",
+        "data": {
+          "username": "Email",
+          "password": "Password",
+          "region": "Region"
+        },
+        "data_description": {
+          "region": "Europe for accounts made at {eu_site}, North America for those made at {na_site}."
+        }
+      },
+      "verify_mfa": {
+        "title": "Verification code",
+        "description": "Enter the code ResMed sent to your email.",
+        "data": {
+          "verification_code": "Code"
+        }
+      },
+      "sensors": {
+        "title": "Bedroom sensors",
+        "description": "Optional. The temperature and humidity of the bedroom are averaged over each night's session and kept with the night.",
+        "data": {
+          "temperature_entity": "Temperature",
+          "humidity_entity": "Humidity"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in to myAir again",
+        "description": "myAir no longer accepts the login of {username}. Enter the password to sign in again.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "myAir refused the email or the password.",
+      "invalid_code": "myAir refused the code. Check it and try again.",
+      "incomplete_account": "The account's setup isn't finished in the myAir app, or it has no device.",
+      "cannot_connect": "myAir couldn't be reached. Try again in a moment."
+    },
+    "abort": {
+      "already_configured": "This device has already been added.",
+      "reauth_successful": "Signed in to myAir again.",
+      "wrong_account": "That account belongs to a different device than this entry."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Bedroom sensors",
+        "description": "The temperature and humidity of the bedroom are averaged over each night's session and kept with the night. A change applies to the nights to come.",
+        "data": {
+          "temperature_entity": "Temperature",
+          "humidity_entity": "Humidity"
+        }
+      }
+    }
+  },
+  "selector": {
+    "region": {
+      "options": {
+        "eu": "Europe",
+        "na": "North America"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "night": {
+        "name": "Night"
+      },
+      "start": {
+        "name": "Sleep start"
+      },
+      "end": {
+        "name": "Sleep end"
+      },
+      "usage": {
+        "name": "Usage"
+      },
+      "ahi": {
+        "name": "AHI"
+      },
+      "leak": {
+        "name": "Mask leak"
+      },
+      "mask_pairs": {
+        "name": "Mask on/off"
+      },
+      "score": {
+        "name": "Sleep score"
+      },
+      "usage_score": {
+        "name": "Usage score"
+      },
+      "ahi_score": {
+        "name": "AHI score"
+      },
+      "mask_score": {
+        "name": "Mask score"
+      },
+      "leak_score": {
+        "name": "Leak score"
+      },
+      "temperature": {
+        "name": "Temperature"
+      },
+      "temperature_min": {
+        "name": "Lowest temperature"
+      },
+      "temperature_max": {
+        "name": "Highest temperature"
+      },
+      "humidity": {
+        "name": "Humidity"
+      },
+      "compliance": {
+        "name": "Compliance, 30 days"
+      },
+      "last_upload": {
+        "name": "Last upload"
+      }
+    }
+  },
+  "services": {
+    "import_nights": {
+      "name": "Import nights",
+      "description": "Adds nights kept elsewhere to the stored ones. A value already stored is never replaced.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Device",
+          "description": "The entry the nights belong to."
+        },
+        "nights": {
+          "name": "Nights",
+          "description": "A list of nights, each with its date and any of the fields a stored night has."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "entry_not_loaded": {
+      "message": "No loaded ResMed myAir Sleep entry has that ID."
+    }
+  }
+}
