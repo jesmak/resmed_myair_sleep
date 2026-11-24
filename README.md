@@ -17,7 +17,8 @@ With a temperature and a humidity sensor chosen for the bedroom, it also keeps t
 values over each night's session, read from Home Assistant's recorder, so the room's conditions can be compared with
 how the nights went.
 
-The sensors show the latest night. The stored nights are available to cards through a websocket command.
+The sensors show the latest night. The integration comes with a dashboard card that draws the stored nights, with
+last night, the nights over weeks and months, and AHI against the bedroom's temperature or humidity.
 
 ## Installation
 
@@ -130,8 +131,100 @@ Each stored night has its `date` and the fields it has data for:
 | `humidity`, `humidity_min`, `humidity_max`                      | The bedroom's average, lowest and highest humidity over the session      |
 | `temperature_readings`, `humidity_readings`                     | How many readings each was computed from                                 |
 
-A card gets them over the websocket with `{"type": "resmed_myair_sleep/nights", "entry_id": "<entry id>"}`, which
-answers `{"nights": [...]}`, oldest first.
+A card gets them over the websocket with `{"type": "resmed_myair_sleep/nights", "entity_id": "<sensor>"}`, where the
+sensor is any of the machine's sensors. It answers `{"nights": [...]}`, oldest first.
+
+## Sleep card
+
+The integration comes with a dashboard card for one machine, with three views to choose from.
+
+- **Last night** shows the newest night the machine was used. The session is a bar on the night from 20:00 to noon,
+  under it the sleep score's parts, and then the night's AHI, usage, mask leak, mask on/off and the bedroom's
+  temperature and humidity. A dot beside AHI, usage and leak tells whether the value is within its limit.
+- **The nights** shows the nights of the last `days` days. They can be drawn as bars of one
+  figure, with a line of the bedroom's temperature or humidity over them, as four small charts of AHI, usage, leak and
+  the score, or as a calendar coloured by one figure, with the 30-day compliance at the top.
+- **Sleep and the room** shows how AHI goes with the bedroom's temperature or humidity over the nights that have them.
+  It can be drawn as the average AHI for each degree or each 5 % of humidity, or as a dot for each night, coloured by
+  its mask leak.
+
+A night with no use, or no data at all, counts as unused. The colours follow the limits. AHI is good below
+`ahi_limit`, high from it and bad from twice it. Leak is good below `leak_limit` and bad from 5/3 of
+it. Usage is good from `usage_hours` and bad at zero. The score is good from 80 and high from 60.
+
+The chips on the card switch the figure, the line or the room for the moment, without changing the card's options.
+
+The card asks the integration for the stored nights, so it shows every night, not only what the recorder has kept.
+The integration serves the card itself and adds it to the dashboards' resources when it starts, so the card is always
+the integration's own version. With the resources set in YAML (`resource_mode: yaml`), it can't add or update itself,
+and the log says which line to add, change or remove.
+
+### Card options
+
+The card has a visual editor. Add **ResMed myAir Sleep** from the card picker and choose any of the machine's sensors.
+The options can also be written by hand, and `height_mode`, `height` and `max_height` only by hand. In a sections view
+the layout tab sets the card's height. They are for where there is no layout tab, such as a masonry or panel view, or a
+stack or other card the card is inside, even in a sections view.
+
+| Name           | Type   | Description                                                                                                                                                                                                                                                                                                                | Default                                                                         |
+| -------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `type`         | string | `custom:resmed-myair-sleep-card`                                                                                                                                                                                                                                                                                           | required                                                                        |
+| `entity`       | string | Any of the machine's sensors                                                                                                                                                                                                                                                                                               | required                                                                        |
+| `view`         | string | `last_night`, `nights` or `room`                                                                                                                                                                                                                                                                                           | `last_night`                                                                    |
+| `nights_chart` | string | How `nights` is drawn. `bars`, `charts` for the four small charts, or `calendar`                                                                                                                                                                                                                                           | `bars`                                                                          |
+| `metric`       | string | The figure the bars and the calendar show first. `ahi`, `usage`, `leak` or `score`                                                                                                                                                                                                                                         | `ahi`                                                                           |
+| `room_line`    | string | The line over the bars. `temperature`, `humidity` or `none`                                                                                                                                                                                                                                                                | `temperature`                                                                   |
+| `room_chart`   | string | How `room` is drawn. `bins` for the average AHI by range, or `scatter` for a dot per night                                                                                                                                                                                                                                 | `bins`                                                                          |
+| `room`         | string | What `room` shows first. `temperature` or `humidity`                                                                                                                                                                                                                                                                       | `temperature`                                                                   |
+| `days`         | number | How many days back `nights` and `room` reach, from 7 to 3650                                                                                                                                                                                                                                                               | `90`                                                                            |
+| `ahi_limit`    | number | The AHI below which a night is good                                                                                                                                                                                                                                                                                        | `5`                                                                             |
+| `leak_limit`   | number | The mask leak in L/min below which a night is good                                                                                                                                                                                                                                                                         | `24`                                                                            |
+| `usage_hours`  | number | The hours of use from which a night is good, and which the compliance counts                                                                                                                                                                                                                                               | `4`                                                                             |
+| `height_mode`  | string | How tall the card is. `auto` fits its content, `fixed` keeps it at `height`, `max` lets it grow up to `max_height`. A height in grid rows, set in the layout tab of a sections view, is used instead                                                                                                                       | `fixed` when `height` is set, `max` when only `max_height` is, otherwise `auto` |
+| `height`       | number | The card's height in pixels, for `fixed`                                                                                                                                                                                                                                                                                   |                                                                                 |
+| `max_height`   | number | The card's greatest height in pixels, for `max`                                                                                                                                                                                                                                                                            |                                                                                 |
+| `row_step`     | string | How the card rounds its height on automatic rows in a sections view, with `height_mode` `auto` or `max`. `full` rounds it up to whole rows, so the cards under it stay on the rows. `half` rounds it up to half rows, which saves space but can leave the cards under it half a row off the rows of the sections beside it | `full`                                                                          |
+
+### Sizes
+
+In a sections view the card is the section's full width by default, and can be made as narrow as 6 columns. On
+automatic rows it ends on whole rows, or on half rows with `row_step: half`, and a chart takes the room left over. Room
+a chart gets beyond its own height first widens its gaps to the parts above and below it, by up to 20 px each, and the
+chart grows by the rest. The same goes for a card held taller than its content.
+
+Held lower than its content needs, a chart shrinks down to 90 px, and the small charts down to 40 px each. The rows of
+last night, the room's ranges and the calendar scroll instead, and the calendar opens on its newest month. Each view
+has its least height, which the card doesn't go below.
+
+## Examples
+
+A sections view of two sections. One has last night and the nights' AHI with the bedroom's humidity over the bars,
+the other a calendar of 180 days and a dot for each night against the bedroom's temperature.
+
+```yaml
+type: sections
+max_columns: 2
+sections:
+  - type: grid
+    cards:
+      - type: custom:resmed-myair-sleep-card
+        entity: sensor.airsense_11_autoset_ahi
+      - type: custom:resmed-myair-sleep-card
+        entity: sensor.airsense_11_autoset_ahi
+        view: nights
+        room_line: humidity
+  - type: grid
+    cards:
+      - type: custom:resmed-myair-sleep-card
+        entity: sensor.airsense_11_autoset_ahi
+        view: nights
+        nights_chart: calendar
+        days: 180
+      - type: custom:resmed-myair-sleep-card
+        entity: sensor.airsense_11_autoset_ahi
+        view: room
+        room_chart: scatter
+```
 
 ## Data
 
@@ -148,6 +241,9 @@ The integration's texts are in `custom_components/resmed_myair_sleep/translation
 by its language code, such as `en.json` and `fi.json`. To add a language, copy `en.json` to the new language's code
 and translate the values.
 
+The card's texts are in `frontend/src/localize/languages/`, in the same way. The card finds a new file by itself and
+uses it when Home Assistant is set to that language. A text left out falls back to English.
+
 ## Development
 
 Requires Python 3.14, the version the current Home Assistant needs.
@@ -158,6 +254,19 @@ python3.14 -m venv .venv
 .venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv/bin/pytest
 ```
 
+The card is in `frontend/` and requires Node 22.13 or newer:
+
+```
+cd frontend
+npm install
+npm run check
+```
+
+`npm run check` typechecks, lints, checks formatting, runs the tests and builds
+`custom_components/resmed_myair_sleep/www/resmed-myair-sleep-card.js`, which is the file the integration serves and is
+committed to the repository. The card carries the integration's version from `manifest.json`. To have git refuse a
+commit whose built card doesn't match `frontend/`, run `git config core.hooksPath .githooks` once.
+
 | Path                                                  | What it contains                                                                            |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `custom_components/resmed_myair_sleep/client/`        | The myAir client, with the login by the emailed code and the GraphQL queries                |
@@ -165,6 +274,8 @@ python3.14 -m venv .venv
 | `custom_components/resmed_myair_sleep/coordinator.py` | Polling myAir, the storage, and reading the room's conditions from the recorder             |
 | `custom_components/resmed_myair_sleep/sensor.py`      | The sensors                                                                                 |
 | `custom_components/resmed_myair_sleep/__init__.py`    | Setting up, the action and the websocket command                                            |
+| `custom_components/resmed_myair_sleep/card.py`        | Serving the card and keeping its dashboard resource                                         |
+| `frontend/src/`                                       | The card: its views, charts, data, editor and texts                                         |
 | `tests/`                                              | Tests, run with pytest and a mocked myAir                                                   |
 
 ## Support
