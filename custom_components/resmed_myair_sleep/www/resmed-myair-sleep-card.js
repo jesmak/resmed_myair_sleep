@@ -717,6 +717,7 @@ function timeline(options) {
 
 // src/const.ts
 var CARD_VERSION = "1.0.0";
+var DEFAULT_SCROLL_INDICATOR = "both";
 
 // src/data.ts
 var DEFAULT_LIMITS = { ahi_limit: 5, leak_limit: 24, usage_hours: 4 };
@@ -880,6 +881,11 @@ var en_default = {
     ahi_limit: "AHI is good below",
     leak_limit: "Leak is good below (L/min)",
     usage_hours: "Usage is good from (h)",
+    scroll_indicator: "Scrolling",
+    scroll_indicator_helper: "Shown when the card's height is limited and its content doesn't all fit",
+    scroll_indicator_both: "Faded edge and scrollbar",
+    scroll_indicator_fade: "Faded edge",
+    scroll_indicator_scrollbar: "Scrollbar",
     row_step: "Height rounding",
     row_step_helper: "On automatic rows the card rounds its height to whole or half rows",
     row_step_full: "Whole rows",
@@ -890,6 +896,7 @@ var en_default = {
     invalid_option: "An option has a value the card doesn't know",
     invalid_height: "The height is auto, fixed or max, and the heights in pixels",
     invalid_row_step: "The row step is full or half",
+    invalid_scroll_indicator: "Scrolling is both, fade or scrollbar",
     entity_not_found: "Sensor {entity} isn't found",
     not_supported: "{entity} isn't a sensor of ResMed myAir Sleep",
     fetch_failed: "The nights couldn't be fetched. Trying again in a minute."
@@ -980,6 +987,11 @@ var fi_default = {
     ahi_limit: "AHI on hyv\xE4 alle",
     leak_limit: "Vuoto on hyv\xE4 alle (L/min)",
     usage_hours: "K\xE4ytt\xF6 on hyv\xE4 v\xE4hint\xE4\xE4n (h)",
+    scroll_indicator: "Vieritys",
+    scroll_indicator_helper: "N\xE4kyy, kun kortin korkeus on rajattu eik\xE4 koko sis\xE4lt\xF6 mahdu siihen",
+    scroll_indicator_both: "H\xE4ivytetty reuna ja vierityspalkki",
+    scroll_indicator_fade: "H\xE4ivytetty reuna",
+    scroll_indicator_scrollbar: "Vierityspalkki",
     row_step: "Korkeuden py\xF6ristys",
     row_step_helper: "Automaattisilla riveill\xE4 kortti py\xF6rist\xE4\xE4 korkeutensa kokonaisiin tai puoliin riveihin",
     row_step_full: "Kokonaiset rivit",
@@ -990,6 +1002,7 @@ var fi_default = {
     invalid_option: "Asetuksella on arvo, jota kortti ei tunne",
     invalid_height: "Korkeus on auto, fixed tai max, ja korkeudet pikselein\xE4",
     invalid_row_step: "Rivien py\xF6ristys on full tai half",
+    invalid_scroll_indicator: "Vieritys on both, fade tai scrollbar",
     entity_not_found: "Anturia {entity} ei l\xF6ydy",
     not_supported: "{entity} ei ole ResMed myAir -laitteen anturi",
     fetch_failed: "\xD6iden haku ep\xE4onnistui. Uusi yritys minuutin kuluttua."
@@ -1019,6 +1032,146 @@ function read(table, key) {
 function browserLanguage() {
   return document.documentElement.lang || navigator.language || "en";
 }
+
+// src/fade.ts
+var SCROLL_INDICATORS = ["both", "fade", "scrollbar"];
+function validScrollIndicator(config) {
+  return config.scroll_indicator === void 0 || config.scroll_indicator === null || SCROLL_INDICATORS.includes(config.scroll_indicator);
+}
+function scrollIndicator(config, fallback) {
+  return config.scroll_indicator ?? fallback;
+}
+function scrollIndicatorSchema(text) {
+  return [
+    {
+      name: "scroll_indicator",
+      selector: {
+        select: {
+          mode: "dropdown",
+          options: SCROLL_INDICATORS.map((value) => ({ value, label: text(`editor.scroll_indicator_${value}`) }))
+        }
+      }
+    }
+  ];
+}
+function scrollIndicatorData(config, fallback) {
+  return { ...config, scroll_indicator: scrollIndicator(config, fallback) };
+}
+function tidyScrollIndicator(config, fallback) {
+  const tidied = { ...config };
+  if (scrollIndicator(tidied, fallback) === fallback) {
+    delete tidied.scroll_indicator;
+  }
+  return tidied;
+}
+var fadeStyles = i`
+    .fades {
+        --fade-length: min(24px, 25%);
+        scroll-padding-block: calc(var(--fade-top-offset, 0px) + var(--fade-length, 24px)) var(--fade-length, 24px);
+    }
+
+    .fade-top {
+        mask-image: linear-gradient(
+            to bottom,
+            #000 var(--fade-top-offset, 0px),
+            transparent var(--fade-top-offset, 0px),
+            #000 calc(var(--fade-top-offset, 0px) + var(--fade-length, 24px))
+        );
+    }
+
+    .fade-bottom {
+        mask-image: linear-gradient(to top, transparent, #000 var(--fade-length, 24px));
+    }
+
+    .fade-top.fade-bottom {
+        mask-image: linear-gradient(
+            to bottom,
+            #000 var(--fade-top-offset, 0px),
+            transparent var(--fade-top-offset, 0px),
+            #000 calc(var(--fade-top-offset, 0px) + var(--fade-length, 24px)),
+            #000 calc(100% - var(--fade-length, 24px)),
+            transparent
+        );
+    }
+
+    /* Over the card's own scrollbar style, whatever its selector. */
+    .scroll-hidden {
+        scrollbar-width: none !important;
+    }
+
+    .scroll-hidden::-webkit-scrollbar {
+        display: none;
+    }
+`;
+function markFade(part) {
+  const hidden = part.scrollHeight - part.clientHeight;
+  part.classList.toggle("fade-top", hidden > 1 && part.scrollTop > 1);
+  part.classList.toggle("fade-bottom", hidden > 1 && hidden - part.scrollTop > 1);
+}
+var onScroll = (event) => markFade(event.currentTarget);
+var ScrollFade = class {
+  constructor(host, parts, indicator) {
+    this.host = host;
+    this.parts = parts;
+    this.indicator = indicator;
+    /** Each followed part with the children whose size it watches. */
+    this.followed = /* @__PURE__ */ new Map();
+    this.resized = typeof ResizeObserver === "undefined" ? void 0 : new ResizeObserver((entries) => {
+      for (const { target } of entries) {
+        const part = this.followed.has(target) ? target : target.parentElement;
+        if (part && this.followed.has(part)) {
+          markFade(part);
+        }
+      }
+    });
+    host.addController(this);
+  }
+  hostConnected() {
+    if (this.host.hasUpdated) {
+      this.follow();
+    }
+  }
+  hostUpdated() {
+    if (this.host.isConnected) {
+      this.follow();
+    }
+  }
+  hostDisconnected() {
+    for (const part of [...this.followed.keys()]) {
+      this.forget(part);
+    }
+  }
+  follow() {
+    const indicator = this.indicator();
+    const now = new Set(indicator === "scrollbar" ? [] : this.parts());
+    for (const part of [...this.followed.keys()]) {
+      if (!now.has(part)) {
+        this.forget(part);
+      }
+    }
+    for (const part of now) {
+      if (!this.followed.has(part)) {
+        part.addEventListener("scroll", onScroll, { passive: true });
+        this.resized?.observe(part);
+      }
+      part.classList.add("fades");
+      part.classList.toggle("scroll-hidden", indicator === "fade");
+      const before = this.followed.get(part) ?? [];
+      const children = [...part.children];
+      before.filter((child) => !children.includes(child)).forEach((child) => this.resized?.unobserve(child));
+      children.filter((child) => !before.includes(child)).forEach((child) => this.resized?.observe(child));
+      this.followed.set(part, children);
+      markFade(part);
+    }
+  }
+  forget(part) {
+    this.followed.get(part)?.forEach((child) => this.resized?.unobserve(child));
+    this.followed.delete(part);
+    part.removeEventListener("scroll", onScroll);
+    this.resized?.unobserve(part);
+    part.classList.remove("fades", "fade-top", "fade-bottom", "scroll-hidden");
+  }
+};
 
 // src/height.ts
 var HEIGHT_MODES = ["auto", "fixed", "max"];
@@ -1162,6 +1315,7 @@ function schema(config, text) {
       flatten: true,
       schema: [number("ahi_limit", 0.5), number("leak_limit", 1), number("usage_hours", 0.5)]
     },
+    ...scrollIndicatorSchema(text),
     ...rowStepSchema(config, text)
   ];
 }
@@ -1180,7 +1334,7 @@ var ResmedMyairSleepCardEditor = class extends i4 {
     return b2`
             <ha-form
                 .hass=${this.hass}
-                .data=${{ ...DEFAULTS, ...rowStepData(this.config) }}
+                .data=${{ ...DEFAULTS, ...scrollIndicatorData(rowStepData(this.config), DEFAULT_SCROLL_INDICATOR) }}
                 .schema=${schema(this.config, (key) => this.text(key))}
                 .computeLabel=${(entry) => this.text(`editor.${entry.name}`)}
                 .computeHelper=${(entry) => this.helper(entry.name)}
@@ -1189,7 +1343,7 @@ var ResmedMyairSleepCardEditor = class extends i4 {
         `;
   }
   valueChanged(event) {
-    const config = tidyRowStep({ ...event.detail.value });
+    const config = tidyScrollIndicator(tidyRowStep({ ...event.detail.value }), DEFAULT_SCROLL_INDICATOR);
     for (const [key, value] of Object.entries(DEFAULTS)) {
       if (config[key] === value || config[key] == null) {
         delete config[key];
@@ -1218,104 +1372,6 @@ __decorateClass([
 if (!customElements.get("resmed-myair-sleep-card-editor")) {
   customElements.define("resmed-myair-sleep-card-editor", ResmedMyairSleepCardEditor);
 }
-
-// src/fade.ts
-var fadeStyles = i`
-    .fades {
-        --fade-length: min(24px, 25%);
-        scroll-padding-block: calc(var(--fade-top-offset, 0px) + var(--fade-length, 24px)) var(--fade-length, 24px);
-    }
-
-    .fade-top {
-        mask-image: linear-gradient(
-            to bottom,
-            #000 var(--fade-top-offset, 0px),
-            transparent var(--fade-top-offset, 0px),
-            #000 calc(var(--fade-top-offset, 0px) + var(--fade-length, 24px))
-        );
-    }
-
-    .fade-bottom {
-        mask-image: linear-gradient(to top, transparent, #000 var(--fade-length, 24px));
-    }
-
-    .fade-top.fade-bottom {
-        mask-image: linear-gradient(
-            to bottom,
-            #000 var(--fade-top-offset, 0px),
-            transparent var(--fade-top-offset, 0px),
-            #000 calc(var(--fade-top-offset, 0px) + var(--fade-length, 24px)),
-            #000 calc(100% - var(--fade-length, 24px)),
-            transparent
-        );
-    }
-`;
-function markFade(part) {
-  const hidden = part.scrollHeight - part.clientHeight;
-  part.classList.toggle("fade-top", hidden > 1 && part.scrollTop > 1);
-  part.classList.toggle("fade-bottom", hidden > 1 && hidden - part.scrollTop > 1);
-}
-var onScroll = (event) => markFade(event.currentTarget);
-var ScrollFade = class {
-  constructor(host, parts) {
-    this.host = host;
-    this.parts = parts;
-    /** Each followed part with the children whose size it watches. */
-    this.followed = /* @__PURE__ */ new Map();
-    this.resized = typeof ResizeObserver === "undefined" ? void 0 : new ResizeObserver((entries) => {
-      for (const { target } of entries) {
-        const part = this.followed.has(target) ? target : target.parentElement;
-        if (part && this.followed.has(part)) {
-          markFade(part);
-        }
-      }
-    });
-    host.addController(this);
-  }
-  hostConnected() {
-    if (this.host.hasUpdated) {
-      this.follow();
-    }
-  }
-  hostUpdated() {
-    if (this.host.isConnected) {
-      this.follow();
-    }
-  }
-  hostDisconnected() {
-    for (const part of [...this.followed.keys()]) {
-      this.forget(part);
-    }
-  }
-  follow() {
-    const now = new Set(this.parts());
-    for (const part of [...this.followed.keys()]) {
-      if (!now.has(part)) {
-        this.forget(part);
-      }
-    }
-    for (const part of now) {
-      if (!this.followed.has(part)) {
-        part.addEventListener("scroll", onScroll, { passive: true });
-        this.resized?.observe(part);
-      }
-      part.classList.add("fades");
-      const before = this.followed.get(part) ?? [];
-      const children = [...part.children];
-      before.filter((child) => !children.includes(child)).forEach((child) => this.resized?.unobserve(child));
-      children.filter((child) => !before.includes(child)).forEach((child) => this.resized?.observe(child));
-      this.followed.set(part, children);
-      markFade(part);
-    }
-  }
-  forget(part) {
-    this.followed.get(part)?.forEach((child) => this.resized?.unobserve(child));
-    this.followed.delete(part);
-    part.removeEventListener("scroll", onScroll);
-    this.resized?.unobserve(part);
-    part.classList.remove("fades", "fade-top", "fade-bottom");
-  }
-};
 
 // src/resmed-myair-sleep-card.ts
 var VIEWS = ["last_night", "nights", "room"];
@@ -1392,7 +1448,11 @@ var ResmedMyairSleepCard = class extends i4 {
         this.hovered = void 0;
       }
     };
-    new ScrollFade(this, () => this.isHeld() ? [...this.renderRoot.querySelectorAll(".scroller")] : []);
+    new ScrollFade(
+      this,
+      () => this.isHeld() ? [...this.renderRoot.querySelectorAll(".scroller")] : [],
+      () => scrollIndicator(this.config ?? {}, DEFAULT_SCROLL_INDICATOR)
+    );
   }
   static getConfigElement() {
     return document.createElement("resmed-myair-sleep-card-editor");
@@ -1417,6 +1477,9 @@ var ResmedMyairSleepCard = class extends i4 {
     }
     if (!validRowStep(config)) {
       throw new Error(translate(language, "error.invalid_row_step"));
+    }
+    if (!validScrollIndicator(config)) {
+      throw new Error(translate(language, "error.invalid_scroll_indicator"));
     }
     if (config.entity !== this.config?.entity) {
       this.nights = void 0;

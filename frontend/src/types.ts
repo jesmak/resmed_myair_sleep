@@ -1,3 +1,4 @@
+import type { ScrollIndicatorConfig } from "./fade";
 import type { HeightConfig } from "./height";
 import type { RowStepConfig } from "./rows";
 
@@ -38,7 +39,7 @@ export interface Limits {
     usage_hours: number;
 }
 
-export interface SleepCardConfig extends HeightConfig, RowStepConfig, Partial<Limits> {
+export interface SleepCardConfig extends HeightConfig, RowStepConfig, ScrollIndicatorConfig, Partial<Limits> {
     type: string;
     entity: string;
     view?: View;

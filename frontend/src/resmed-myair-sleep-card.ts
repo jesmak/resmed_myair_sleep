@@ -8,7 +8,7 @@ import { property, state } from "lit/decorators.js";
 
 import { barChart, scatter, timeline, tooltipPosition } from "./charts";
 import type { Bar } from "./charts";
-import { CARD_VERSION } from "./const";
+import { CARD_VERSION, DEFAULT_SCROLL_INDICATOR } from "./const";
 import {
     DEFAULT_LIMITS,
     addDays,
@@ -25,7 +25,7 @@ import {
 } from "./data";
 import type { Level } from "./data";
 import { cardEntities } from "./editor";
-import { ScrollFade, fadeStyles } from "./fade";
+import { ScrollFade, fadeStyles, scrollIndicator, validScrollIndicator } from "./fade";
 import type { HomeAssistant } from "./hass";
 import { gridMinRows, heightCardSize, heightMode, heightStyle, validHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
@@ -128,7 +128,11 @@ export class ResmedMyairSleepCard extends LitElement {
 
     public constructor() {
         super();
-        new ScrollFade(this, () => (this.isHeld() ? [...this.renderRoot.querySelectorAll<HTMLElement>(".scroller")] : []));
+        new ScrollFade(
+            this,
+            () => (this.isHeld() ? [...this.renderRoot.querySelectorAll<HTMLElement>(".scroller")] : []),
+            () => scrollIndicator(this.config ?? {}, DEFAULT_SCROLL_INDICATOR),
+        );
     }
 
     public static getConfigElement(): HTMLElement {
@@ -164,6 +168,9 @@ export class ResmedMyairSleepCard extends LitElement {
         }
         if (!validRowStep(config)) {
             throw new Error(translate(language, "error.invalid_row_step"));
+        }
+        if (!validScrollIndicator(config)) {
+            throw new Error(translate(language, "error.invalid_scroll_indicator"));
         }
         if (config.entity !== this.config?.entity) {
             this.nights = undefined;

@@ -9,6 +9,8 @@ import { property, state } from "lit/decorators.js";
 import { DEFAULT_LIMITS } from "./data";
 import type { HomeAssistant } from "./hass";
 import { browserLanguage, translate } from "./localize/localize";
+import { DEFAULT_SCROLL_INDICATOR } from "./const";
+import { scrollIndicatorData, scrollIndicatorSchema, tidyScrollIndicator } from "./fade";
 import { rowStepData, rowStepSchema, tidyRowStep } from "./rows";
 import type { SleepCardConfig } from "./types";
 
@@ -71,6 +73,7 @@ function schema(config: SleepCardConfig, text: (key: string) => string): Record<
             flatten: true,
             schema: [number("ahi_limit", 0.5), number("leak_limit", 1), number("usage_hours", 0.5)],
         },
+        ...scrollIndicatorSchema(text),
         ...rowStepSchema(config, text),
     ];
 }
@@ -90,7 +93,7 @@ export class ResmedMyairSleepCardEditor extends LitElement {
         return html`
             <ha-form
                 .hass=${this.hass}
-                .data=${{ ...DEFAULTS, ...rowStepData(this.config) }}
+                .data=${{ ...DEFAULTS, ...scrollIndicatorData(rowStepData(this.config), DEFAULT_SCROLL_INDICATOR) }}
                 .schema=${schema(this.config, (key) => this.text(key))}
                 .computeLabel=${(entry: SchemaEntry) => this.text(`editor.${entry.name}`)}
                 .computeHelper=${(entry: SchemaEntry) => this.helper(entry.name)}
@@ -100,7 +103,8 @@ export class ResmedMyairSleepCardEditor extends LitElement {
     }
 
     private valueChanged(event: CustomEvent<{ value: SleepCardConfig }>): void {
-        const config = tidyRowStep({ ...event.detail.value }) as SleepCardConfig & Record<string, unknown>;
+        const config = tidyScrollIndicator(tidyRowStep({ ...event.detail.value }), DEFAULT_SCROLL_INDICATOR) as SleepCardConfig &
+            Record<string, unknown>;
         for (const [key, value] of Object.entries(DEFAULTS)) {
             if (config[key] === value || config[key] == null) {
                 delete config[key];
