@@ -5,6 +5,9 @@ temperature and humidity over the night's session.
 
 [![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![Downloads][downloads-shield]][releases] [![Marketplace][marketplace-shield]][marketplace] [![License][license-shield]](LICENSE)
 
+<img src="https://raw.githubusercontent.com/jesmak/resmed_myair_sleep/main/docs/images/dashboard-light.png#gh-light-mode-only" width="1280" alt="A dashboard of the sleep card's views. Last night's session from just after midnight to half past six with 94 points, AHI 3.8, 6 h 27 min of use and the bedroom at 20.5 °C. The nights since July as AHI bars under a purple line of the bedroom's temperature, cooling into autumn. Half a year of AHI, usage, leak and the score as four small charts. The calendar of July to October coloured by AHI, with 77 % of the last 30 nights kept. The average AHI rising from 2.7 to 4.1 as the bedroom warms from 20 to 24 °C">
+<img src="https://raw.githubusercontent.com/jesmak/resmed_myair_sleep/main/docs/images/dashboard-dark.png#gh-dark-mode-only" width="1280" alt="A dashboard of the sleep card's views. Last night's session from just after midnight to half past six with 94 points, AHI 3.8, 6 h 27 min of use and the bedroom at 20.5 °C. The nights since July as AHI bars under a purple line of the bedroom's temperature, cooling into autumn. Half a year of AHI, usage, leak and the score as four small charts. The calendar of July to October coloured by AHI, with 77 % of the last 30 nights kept. The average AHI rising from 2.7 to 4.1 as the bedroom warms from 20 to 24 °C">
+
 ## What is it?
 
 A ResMed CPAP, such as an AirSense 10 or 11, uploads each night to ResMed's myAir service, and the myAir app shows the
@@ -135,6 +138,13 @@ A card gets them over the websocket with `{"type": "resmed_myair_sleep/nights", 
 sensor is any of the machine's sensors. It answers `{"nights": [...]}`, oldest first.
 
 ## Sleep card
+
+<p>
+<img src="https://raw.githubusercontent.com/jesmak/resmed_myair_sleep/main/docs/images/sleep-last-night-light.png#gh-light-mode-only" width="400" alt="Last night's session on a timeline from 20 to 12, from 12:07 AM to 06:34 AM, with 94 points, the score's parts under it, and AHI 3.8, 6 h 27 min of use and a leak of 14.4 L/min each with a green dot, one mask on/off and the bedroom at 20.5 °C and 45 %">
+<img src="https://raw.githubusercontent.com/jesmak/resmed_myair_sleep/main/docs/images/sleep-last-night-dark.png#gh-dark-mode-only" width="400" alt="Last night's session on a timeline from 20 to 12, from 12:07 AM to 06:34 AM, with 94 points, the score's parts under it, and AHI 3.8, 6 h 27 min of use and a leak of 14.4 L/min each with a green dot, one mask on/off and the bedroom at 20.5 °C and 45 %">
+<img src="https://raw.githubusercontent.com/jesmak/resmed_myair_sleep/main/docs/images/sleep-nights-light.png#gh-light-mode-only" width="400" alt="Three months of nights as AHI bars, mostly green below the limit of 5 with a few orange and one red, under a purple line of the bedroom's temperature cooling from about 23 to 20 degrees">
+<img src="https://raw.githubusercontent.com/jesmak/resmed_myair_sleep/main/docs/images/sleep-nights-dark.png#gh-dark-mode-only" width="400" alt="Three months of nights as AHI bars, mostly green below the limit of 5 with a few orange and one red, under a purple line of the bedroom's temperature cooling from about 23 to 20 degrees">
+</p>
 
 The integration comes with a dashboard card for one machine, with three views to choose from.
 
