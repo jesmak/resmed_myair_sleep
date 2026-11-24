@@ -1046,7 +1046,7 @@ export class ResmedMyairSleepCard extends LitElement {
                     --sleep-high: var(--sleep-high-color, var(--warning-color, #ff9800));
                     --sleep-bad: var(--sleep-bad-color, var(--error-color, #db4437));
                     --sleep-score: var(--sleep-score-color, var(--primary-color, #03a9f4));
-                    --sleep-temperature: var(--sleep-temperature-color, var(--warning-color, #ff9800));
+                    --sleep-temperature: var(--sleep-temperature-color, #9c6ade);
                     --sleep-humidity: var(--sleep-humidity-color, var(--info-color, #039be5));
                 }
                 ha-card {
