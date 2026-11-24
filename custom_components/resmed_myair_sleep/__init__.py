@@ -96,7 +96,7 @@ def _coordinator(hass: HomeAssistant, entry_id: str) -> SleepCoordinator:
 async def _async_import_nights(call: ServiceCall) -> dict[str, Any]:
     coordinator = _coordinator(call.hass, call.data[ATTR_CONFIG_ENTRY_ID])
     nights = [{**night, "date": night["date"].isoformat()} for night in call.data[ATTR_NIGHTS]]
-    changed = coordinator.import_nights(nights)
+    changed = await coordinator.import_nights(nights)
     await coordinator.async_save()
     coordinator.async_set_updated_data(coordinator.build_data())
     return {"nights_changed": changed}

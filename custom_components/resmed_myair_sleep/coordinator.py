@@ -101,15 +101,18 @@ class SleepCoordinator(DataUpdateCoordinator[SleepData]):
         except AuthenticationError as err:
             raise ConfigEntryAuthFailed(f"myAir refused the login: {err}") from err
 
-    async def _add_conditions(self, night: dict[str, Any]) -> None:
-        """Add the room's conditions over the night's session, from the recorder's history of the chosen sensors."""
+    async def _add_conditions(self, night: dict[str, Any], keep: bool = False) -> None:
+        """Add the room's conditions over the night's session, from the recorder's history of the chosen sensors.
+
+        With keep, a condition the night already has is left as it is.
+        """
         if not night.get("start") or not night.get("end"):
             return
         start = datetime.fromisoformat(night["start"])
         end = datetime.fromisoformat(night["end"])
         for kind, option in (("temperature", CONF_TEMPERATURE_ENTITY), ("humidity", CONF_HUMIDITY_ENTITY)):
             entity_id = self.config_entry.options.get(option)
-            if not entity_id:
+            if not entity_id or (keep and night.get(kind) is not None):
                 continue
             states = await get_instance(self.hass).async_add_executor_job(
                 history.state_changes_during_period, self.hass, start, end, entity_id, True
@@ -126,7 +129,7 @@ class SleepCoordinator(DataUpdateCoordinator[SleepData]):
     def nights_list(self) -> list[dict[str, Any]]:
         return [self.nights[key] for key in sorted(self.nights)]
 
-    def import_nights(self, nights: list[dict[str, Any]]) -> int:
+    async def import_nights(self, nights: list[dict[str, Any]]) -> int:
         """Fill in nights from an import, keeping every value already stored. Returns the number of nights changed."""
         changed = 0
         for imported in nights:
@@ -136,6 +139,7 @@ class SleepCoordinator(DataUpdateCoordinator[SleepData]):
                 night.update(missing)
                 if "end" not in imported:
                     set_end(night)
+                await self._add_conditions(night, keep=True)
                 changed += 1
         return changed
 

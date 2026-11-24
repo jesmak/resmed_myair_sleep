@@ -70,14 +70,21 @@ async def test_setup_keeps_the_nights_with_the_rooms_conditions(recorder_mock, h
         "import_nights",
         {
             "config_entry_id": entry.entry_id,
-            "nights": [{"date": "2026-01-05", "ahi": 2.2, "usage_minutes": 390}, {"date": "2026-03-10", "ahi": 9.9, "humidity": 55}],
+            "nights": [
+                {"date": "2026-01-05", "ahi": 2.2, "usage_minutes": 390},
+                {"date": "2026-03-10", "ahi": 9.9, "humidity": 55},
+                {"date": "2026-03-11", "start": (START + timedelta(hours=5)).isoformat(), "usage_minutes": 60, "humidity": 55},
+            ],
         },
         blocking=True,
         return_response=True,
     )
-    assert response == {"nights_changed": 1}
+    assert response == {"nights_changed": 2}
     assert entry.runtime_data.nights["2026-03-10"]["ahi"] == 1.4
     assert entry.runtime_data.nights["2026-01-05"]["usage_minutes"] == 390
+    assert "temperature" not in entry.runtime_data.nights["2026-01-05"]
+    assert entry.runtime_data.nights["2026-03-11"]["temperature"] == 18.0
+    assert entry.runtime_data.nights["2026-03-11"]["humidity"] == 55
 
 
 async def test_without_room_sensors_and_the_nights_over_the_websocket(recorder_mock, hass: HomeAssistant, entry, hass_ws_client):
