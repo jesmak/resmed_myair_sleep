@@ -3,7 +3,7 @@
   "name": "ResMed myAir Sleep",
   "codeowners": ["@jesmak"],
   "config_flow": true,
-  "dependencies": ["recorder", "websocket_api"],
+  "dependencies": ["http", "lovelace", "recorder", "websocket_api"],
   "documentation": "https://github.com/jesmak/resmed_myair_sleep",
   "integration_type": "device",
   "iot_class": "cloud_polling",

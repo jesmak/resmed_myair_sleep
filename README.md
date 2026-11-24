@@ -108,12 +108,12 @@ from the recorder, as for the nights myAir gives. Times need their UTC offset. T
 ```yaml
 action: resmed_myair_sleep.import_nights
 data:
-    config_entry_id: 01JEXAMPLE0000000000000000
-    nights:
-        - date: "2026-02-03"
-          start: "2026-02-03T23:12:00+02:00"
-          usage_minutes: 412
-          ahi: 2.1
+  config_entry_id: 01JEXAMPLE0000000000000000
+  nights:
+    - date: "2026-02-03"
+      start: "2026-02-03T23:12:00+02:00"
+      usage_minutes: 412
+      ahi: 2.1
 ```
 
 ## The stored nights

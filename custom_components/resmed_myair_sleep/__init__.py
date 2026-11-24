@@ -6,14 +6,17 @@ from typing import Any
 import voluptuous as vol
 from aiohttp import DummyCookieJar
 from homeassistant.components import websocket_api
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 
+from .card import async_add_card_resource, async_remove_card_resource, async_serve_card
 from .client.myair_client import MyAirConfig
 from .client.rest_client import RESTClient
 from .const import CONF_DEVICE_TOKEN, CONF_REGION, DOMAIN, STORAGE_VERSION
@@ -56,6 +59,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         DOMAIN, SERVICE_IMPORT_NIGHTS, _async_import_nights, schema=IMPORT_SCHEMA, supports_response=SupportsResponse.OPTIONAL
     )
     websocket_api.async_register_command(hass, _ws_nights)
+    await async_serve_card(hass)
     return True
 
 
@@ -70,6 +74,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SleepConfigEntry) -> boo
         # The client handles Okta's cookies itself.
         async_create_clientsession(hass, cookie_jar=DummyCookieJar(), raise_for_status=True),
     )
+    await async_add_card_resource(hass)
     coordinator = SleepCoordinator(hass, entry, client)
     await coordinator.async_load()
     await coordinator.async_config_entry_first_refresh()
@@ -84,6 +89,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: SleepConfigEntry) -> bo
 
 async def async_remove_entry(hass: HomeAssistant, entry: SleepConfigEntry) -> None:
     await Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}").async_remove()
+    if not hass.config_entries.async_entries(DOMAIN):
+        await async_remove_card_resource(hass)
 
 
 def _coordinator(hass: HomeAssistant, entry_id: str) -> SleepCoordinator:
@@ -102,12 +109,16 @@ async def _async_import_nights(call: ServiceCall) -> dict[str, Any]:
     return {"nights_changed": changed}
 
 
-@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/nights", vol.Required("entry_id"): str})
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/nights", vol.Required("entity_id"): cv.entity_id})
 @callback
 def _ws_nights(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
-    try:
-        coordinator = _coordinator(hass, msg["entry_id"])
-    except ServiceValidationError:
-        connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, "No loaded entry with that ID")
+    """The stored nights of the device a sensor of the integration belongs to, oldest first."""
+    entity = er.async_get(hass).async_get(msg["entity_id"])
+    if entity is None or entity.platform != DOMAIN or entity.config_entry_id is None:
+        connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, f"{msg['entity_id']} is not a sensor of {DOMAIN}")
         return
-    connection.send_result(msg["id"], {"nights": coordinator.nights_list()})
+    entry = hass.config_entries.async_get_entry(entity.config_entry_id)
+    if entry is None or entry.state is not ConfigEntryState.LOADED:
+        connection.send_error(msg["id"], "not_loaded", f"The device of {msg['entity_id']} is not loaded")
+        return
+    connection.send_result(msg["id"], {"nights": entry.runtime_data.nights_list()})

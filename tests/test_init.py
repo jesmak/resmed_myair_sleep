@@ -8,6 +8,7 @@ import voluptuous as vol
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import UpdateFailed
 from pytest_homeassistant.common import MockConfigEntry
 from pytest_homeassistant.components.recorder.common import async_wait_recording_done
@@ -98,9 +99,23 @@ async def test_without_room_sensors_and_the_nights_over_the_websocket(recorder_m
     assert "temperature" not in entry.runtime_data.nights["2026-03-10"]
 
     client = await hass_ws_client(hass)
-    await client.send_json_auto_id({"type": f"{DOMAIN}/nights", "entry_id": entry.entry_id})
+    await client.send_json_auto_id({"type": f"{DOMAIN}/nights", "entity_id": "sensor.airsense_11_autoset_ahi"})
     result = await client.receive_json()
     assert [night["date"] for night in result["result"]["nights"]] == ["2026-03-09", "2026-03-10"]
+
+    hass.states.async_set("sensor.someone_elses", "1")
+    await client.send_json_auto_id({"type": f"{DOMAIN}/nights", "entity_id": "sensor.someone_elses"})
+    assert (await client.receive_json())["error"]["code"] == "not_found"
+    other_entry = MockConfigEntry(domain="other_integration")
+    other_entry.add_to_hass(hass)
+    other = er.async_get(hass).async_get_or_create(
+        "sensor", "other_integration", "other-1", suggested_object_id="other_sensor", config_entry=other_entry
+    )
+    await client.send_json_auto_id({"type": f"{DOMAIN}/nights", "entity_id": other.entity_id})
+    assert (await client.receive_json())["error"]["code"] == "not_found"
+    await hass.config_entries.async_unload(entry.entry_id)
+    await client.send_json_auto_id({"type": f"{DOMAIN}/nights", "entity_id": "sensor.airsense_11_autoset_ahi"})
+    assert (await client.receive_json())["error"]["code"] == "not_loaded"
 
 
 async def test_an_import_checks_its_values_and_fills_in_the_end(recorder_mock, hass: HomeAssistant, entry):

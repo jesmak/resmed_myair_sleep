@@ -1,0 +1,98 @@
+{
+    "common": {
+        "name": "ResMed myAir Sleep",
+        "description": "A CPAP's last night, how the nights have gone, and AHI against the bedroom's temperature and humidity",
+        "no_nights": "No nights yet.",
+        "duration": "{hours} h {minutes} min"
+    },
+    "view": {
+        "last_night": "Last night",
+        "nights": "Nights",
+        "room": "Sleep and the room"
+    },
+    "metric": {
+        "ahi": "AHI",
+        "usage": "Usage",
+        "leak": "Leak",
+        "score": "Score"
+    },
+    "goal": {
+        "below": "below {value}",
+        "at_least": "at least {value}"
+    },
+    "last": {
+        "score": "{score} points",
+        "no_session": "The night's start time isn't known.",
+        "mask_pairs": "Mask on/off",
+        "part_usage": "Usage",
+        "part_ahi": "AHI",
+        "part_mask": "Mask",
+        "part_leak": "Leak"
+    },
+    "calendar": {
+        "compliance": "{value} % kept, 30 days",
+        "good": "good",
+        "high": "high",
+        "bad": "poor",
+        "unused": "no use"
+    },
+    "room": {
+        "temperature": "Temperature",
+        "humidity": "Humidity",
+        "none": "No line",
+        "with_temperature": "+ Temperature",
+        "with_humidity": "+ Humidity",
+        "nights": "{count} nights",
+        "empty": "No night has the bedroom's temperature or humidity yet.",
+        "average_ahi": "average AHI",
+        "ahi_nights": "AHI · nights",
+        "bin_tooltip": "{count} nights, AHI {least}–{most}",
+        "leak_below": "leak below {value}",
+        "leak_over": "over {value} L/min"
+    },
+    "editor": {
+        "entity": "Sensor of the machine",
+        "view": "View",
+        "view_last_night": "Last night",
+        "view_nights": "Nights over time",
+        "view_room": "Sleep and the room",
+        "nights_chart": "Chart",
+        "nights_chart_bars": "Bars",
+        "nights_chart_charts": "Four small charts",
+        "nights_chart_calendar": "Calendar",
+        "metric": "Shown first",
+        "metric_ahi": "AHI",
+        "metric_usage": "Usage",
+        "metric_leak": "Leak",
+        "metric_score": "Score",
+        "room_line": "Line over the bars",
+        "room_line_none": "None",
+        "room_line_temperature": "Temperature",
+        "room_line_humidity": "Humidity",
+        "room_chart": "Chart",
+        "room_chart_bins": "Averages by range",
+        "room_chart_scatter": "Each night as a dot",
+        "room": "Shown first",
+        "room_temperature": "Temperature",
+        "room_humidity": "Humidity",
+        "days": "Days back",
+        "days_unit": "days",
+        "limits": "Limits for the colours",
+        "ahi_limit": "AHI is good below",
+        "leak_limit": "Leak is good below (L/min)",
+        "usage_hours": "Usage is good from (h)",
+        "row_step": "Height rounding",
+        "row_step_helper": "On automatic rows the card rounds its height to whole or half rows",
+        "row_step_full": "Whole rows",
+        "row_step_half": "Half rows"
+    },
+    "error": {
+        "invalid_configuration": "Choose a sensor of ResMed myAir Sleep",
+        "invalid_option": "An option has a value the card doesn't know",
+        "invalid_height": "The height is auto, fixed or max, and the heights in pixels",
+        "invalid_row_step": "The row step is full or half",
+        "entity_not_found": "Sensor {entity} isn't found",
+        "not_supported": "{entity} isn't a sensor of ResMed myAir Sleep",
+        "fetch_failed": "The nights couldn't be fetched. Trying again in a minute."
+    }
+}

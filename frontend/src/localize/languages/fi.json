@@ -1,0 +1,98 @@
+{
+    "common": {
+        "name": "ResMed myAir -uni",
+        "description": "CPAP-laitteen viime yö, öiden kehitys ja AHI:n vaihtelu makuuhuoneen lämpötilan ja kosteuden mukaan",
+        "no_nights": "Ei vielä öitä.",
+        "duration": "{hours} h {minutes} min"
+    },
+    "view": {
+        "last_night": "Viime yö",
+        "nights": "Yöt",
+        "room": "Uni ja huone"
+    },
+    "metric": {
+        "ahi": "AHI",
+        "usage": "Käyttö",
+        "leak": "Vuoto",
+        "score": "Pisteet"
+    },
+    "goal": {
+        "below": "alle {value}",
+        "at_least": "vähintään {value}"
+    },
+    "last": {
+        "score": "{score} pistettä",
+        "no_session": "Yön alkamisaika ei ole tiedossa.",
+        "mask_pairs": "Maskin irrotukset",
+        "part_usage": "Käyttö",
+        "part_ahi": "AHI",
+        "part_mask": "Maski",
+        "part_leak": "Vuoto"
+    },
+    "calendar": {
+        "compliance": "Hoitoon sitoutuminen {value} %, 30 pv",
+        "good": "hyvä",
+        "high": "koholla",
+        "bad": "huono",
+        "unused": "ei käyttöä"
+    },
+    "room": {
+        "temperature": "Lämpötila",
+        "humidity": "Kosteus",
+        "none": "Ei viivaa",
+        "with_temperature": "+ Lämpötila",
+        "with_humidity": "+ Kosteus",
+        "nights": "{count} yötä",
+        "empty": "Yhdeltäkään yöltä ei ole vielä makuuhuoneen lämpötilaa tai kosteutta.",
+        "average_ahi": "keskimääräinen AHI",
+        "ahi_nights": "AHI · öitä",
+        "bin_tooltip": "{count} yötä, AHI {least}–{most}",
+        "leak_below": "vuoto alle {value}",
+        "leak_over": "yli {value} L/min"
+    },
+    "editor": {
+        "entity": "Laitteen anturi",
+        "view": "Näkymä",
+        "view_last_night": "Viime yö",
+        "view_nights": "Öiden kehitys",
+        "view_room": "Uni ja huone",
+        "nights_chart": "Kaavio",
+        "nights_chart_bars": "Palkit",
+        "nights_chart_charts": "Neljä pientä kaaviota",
+        "nights_chart_calendar": "Kalenteri",
+        "metric": "Näytetään ensin",
+        "metric_ahi": "AHI",
+        "metric_usage": "Käyttö",
+        "metric_leak": "Vuoto",
+        "metric_score": "Pisteet",
+        "room_line": "Viiva palkkien päällä",
+        "room_line_none": "Ei mitään",
+        "room_line_temperature": "Lämpötila",
+        "room_line_humidity": "Kosteus",
+        "room_chart": "Kaavio",
+        "room_chart_bins": "Keskiarvot ryhmittäin",
+        "room_chart_scatter": "Jokainen yö pisteenä",
+        "room": "Näytetään ensin",
+        "room_temperature": "Lämpötila",
+        "room_humidity": "Kosteus",
+        "days": "Päiviä taaksepäin",
+        "days_unit": "pv",
+        "limits": "Värien rajat",
+        "ahi_limit": "AHI on hyvä alle",
+        "leak_limit": "Vuoto on hyvä alle (L/min)",
+        "usage_hours": "Käyttö on hyvä vähintään (h)",
+        "row_step": "Korkeuden pyöristys",
+        "row_step_helper": "Automaattisilla riveillä kortti pyöristää korkeutensa kokonaisiin tai puoliin riveihin",
+        "row_step_full": "Kokonaiset rivit",
+        "row_step_half": "Puolikkaat rivit"
+    },
+    "error": {
+        "invalid_configuration": "Valitse ResMed myAir -laitteen anturi",
+        "invalid_option": "Asetuksella on arvo, jota kortti ei tunne",
+        "invalid_height": "Korkeus on auto, fixed tai max, ja korkeudet pikseleinä",
+        "invalid_row_step": "Rivien pyöristys on full tai half",
+        "entity_not_found": "Anturia {entity} ei löydy",
+        "not_supported": "{entity} ei ole ResMed myAir -laitteen anturi",
+        "fetch_failed": "Öiden haku epäonnistui. Uusi yritys minuutin kuluttua."
+    }
+}
