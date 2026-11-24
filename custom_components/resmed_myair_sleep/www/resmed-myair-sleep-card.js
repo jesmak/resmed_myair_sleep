@@ -607,7 +607,7 @@ function roundTop(value) {
   return nice * power * 4;
 }
 function barChart(bars, options) {
-  const { width, height, goal, dates, line } = options;
+  const { width, height, goal, dates, line, hovered } = options;
   const right = line ? 30 : 4;
   const bottom = dates ? BOTTOM : 2;
   const values = bars.flatMap((bar) => bar.value === void 0 ? [] : [bar.value]);
@@ -621,9 +621,11 @@ function barChart(bars, options) {
     (tick) => w`<line class="grid ${tick ? "dashed" : ""}" x1=${LEFT} x2=${width - right} y1=${y3(tick)} y2=${y3(tick)}></line>
                 <text class="axis" x=${LEFT - 5} y=${y3(tick) + 3} text-anchor="end">${options.number(tick)}</text>`
   )}
+        ${hovered === void 0 || hovered >= bars.length ? A : w`<rect class="hover" x=${LEFT + hovered * slot} y=${TOP} width=${slot} height=${plot}></rect>`}
         ${bars.map(
     (bar, index) => bar.value === void 0 ? A : w`<rect x=${LEFT + index * slot + (slot - barWidth) / 2} y=${y3(bar.value)} width=${barWidth}
-                      height=${Math.max(1, TOP + plot - y3(bar.value))} rx=${Math.min(2, barWidth / 3)} fill=${bar.color}><title>${bar.tooltip}</title></rect>`
+                      height=${Math.max(1, TOP + plot - y3(bar.value))} rx=${Math.min(2, barWidth / 3)} fill=${bar.color}
+                      fill-opacity=${line ? 0.5 : 1}></rect>`
   )}
         ${goal ? w`<line class="goal" x1=${LEFT} x2=${width - right} y1=${y3(goal.value)} y2=${y3(goal.value)}></line>
                 <text class="goal-label" x=${LEFT + 4} y=${y3(goal.value) - 4}>${goal.label}</text>` : A}
@@ -631,7 +633,15 @@ function barChart(bars, options) {
         ${dates ? [...dates].map(
     ([index, label]) => w`<text class="axis" x=${LEFT + index * slot + slot / 2} y=${height - 4} text-anchor="middle">${label}</text>`
   ) : A}
+        ${bars.map((_2, index) => w`<rect class="hit" data-index=${index} x=${LEFT + index * slot} y=${TOP} width=${slot} height=${plot}></rect>`)}
     </svg>`;
+}
+function tooltipPosition(column, card, chartTop, scale) {
+  const middle = (column.left + column.width / 2 - card.left) / scale;
+  const width = card.width / scale;
+  const flip = middle > width / 2;
+  const gap = column.width / scale;
+  return { x: flip ? width - middle + gap : middle + gap, top: (chartTop - card.top) / scale, flip };
 }
 function lineOver(line, frame) {
   const present = line.values.flatMap((value) => value === void 0 ? [] : [value]);
@@ -652,8 +662,11 @@ function lineOver(line, frame) {
     path += `${drawing ? "L" : "M"}${x2(index).toFixed(1)},${y3(value).toFixed(1)}`;
     drawing = true;
   });
-  return w`<path d=${path} fill="none" stroke=${line.color} stroke-width="2"></path>
-        ${line.values.map((value, index) => value === void 0 ? A : w`<circle cx=${x2(index)} cy=${y3(value)} r="2.2" fill=${line.color}></circle>`)}
+  return w`<path class="halo" d=${path}></path>
+        <path d=${path} fill="none" stroke=${line.color} stroke-width="2.5" stroke-linejoin="round"></path>
+        ${line.values.map(
+    (value, index) => value === void 0 ? A : w`<circle class="dot" cx=${x2(index)} cy=${y3(value)} r="2.6" fill=${line.color}></circle>`
+  )}
         ${[low, high].map(
     (value) => w`<text class="axis" x=${frame.width - frame.right + 4} y=${y3(value) + 3} fill=${line.color}>${line.label(value)}</text>`
   )}`;
@@ -1359,6 +1372,26 @@ var ResmedMyairSleepCard = class extends i4 {
     this.filled = 0;
     this.held = 0;
     this.resizes = typeof ResizeObserver === "undefined" ? void 0 : new ResizeObserver(() => this.measureSoon());
+    /** A bar chart's night under the pointer. A touch keeps its tooltip until the next touch elsewhere. */
+    this.hover = (event) => {
+      const target = event.target;
+      const card = this.renderRoot.querySelector("ha-card");
+      if (!target.classList?.contains("hit") || !card) {
+        this.hovered = void 0;
+        return;
+      }
+      const chart = card.querySelector("svg")?.getBoundingClientRect() ?? target.getBoundingClientRect();
+      const position = tooltipPosition(target.getBoundingClientRect(), card.getBoundingClientRect(), chart.top, drawnScale(card));
+      const index = Number(target.dataset.index);
+      if (this.hovered?.index !== index || this.hovered.flip !== position.flip) {
+        this.hovered = { index, ...position };
+      }
+    };
+    this.unhover = (event) => {
+      if (event.pointerType !== "touch") {
+        this.hovered = void 0;
+      }
+    };
     new ScrollFade(this, () => this.isHeld() ? [...this.renderRoot.querySelectorAll(".scroller")] : []);
   }
   static getConfigElement() {
@@ -1440,7 +1473,10 @@ var ResmedMyairSleepCard = class extends i4 {
     const classes = [held ? "held" : "", this.chartHeight() === void 0 ? "spread" : ""].join(" ");
     return b2`
             <ha-card class=${classes} style=${this.cardStyle()}>
-                <div class="card">${this.nights && this.width ? this.content(view) : A}</div>
+                <div class="card" @pointermove=${this.hover} @pointerdown=${this.hover} @pointerleave=${this.unhover}>
+                    ${this.nights && this.width ? this.content(view) : A}
+                </div>
+                ${this.tooltip()}
             </ha-card>
         `;
   }
@@ -1452,7 +1488,7 @@ var ResmedMyairSleepCard = class extends i4 {
       this.resizes?.observe(card);
       this.observed = card;
     }
-    if (![...changed.keys()].every((key) => ["extra", "gap", "filled", "held"].includes(String(key)))) {
+    if (![...changed.keys()].every((key) => ["extra", "gap", "filled", "held", "hovered"].includes(String(key)))) {
       this.measureSoon();
     }
     const calendar = this.renderRoot.querySelector(".scroller.calendar");
@@ -1665,6 +1701,7 @@ var ResmedMyairSleepCard = class extends i4 {
                 ${barChart(this.barsOf(days, metric), {
       width: this.width,
       height,
+      hovered: this.hovered?.index,
       goal: this.goal(metric),
       dates: this.dateLabels(days.map(({ date }) => date)),
       line: line === "none" ? void 0 : {
@@ -1696,6 +1733,7 @@ var ResmedMyairSleepCard = class extends i4 {
                         ${barChart(this.barsOf(days, metric), {
         width: this.width,
         height: height + (index === METRICS.length - 1 ? 16 : 0),
+        hovered: this.hovered?.index,
         goal: this.goal(metric),
         dates: index === METRICS.length - 1 ? this.dateLabels(days.map(({ date }) => date)) : void 0,
         number: (value) => this.number(value, value % 1 ? 1 : 0)
@@ -1843,15 +1881,52 @@ var ResmedMyairSleepCard = class extends i4 {
                           </div>` : b2`<div class="part muted">${this.text("room.empty")}</div>`}
         `;
   }
+  /** The hovered night's date and values: the shown metric with the room's line, or all four beside the small charts. */
+  tooltip() {
+    const hovered = this.hovered;
+    const shape = this.shape();
+    if (!hovered || !this.nights || shape !== "bars" && shape !== "charts") {
+      return A;
+    }
+    const day = nightsIn(this.nights, windowEnd(this.nights, this.today()), this.days())[hovered.index];
+    if (!day) {
+      return A;
+    }
+    const night = day.night;
+    const line = this.line();
+    const row = (color, label, value) => b2`<div class="tip-row">
+                <span class="tip-dot" style="background: ${color}"></span>${label}<span class="tip-value">${value}</span>
+            </div>`;
+    const rows = !used(night) ? [b2`<div class="muted">${this.text("calendar.unused")}</div>`] : [
+      ...(shape === "charts" ? METRICS : [this.metric()]).map((metric) => {
+        const value = metricValue(night, metric);
+        return row(this.color(metric, value), this.text(`metric.${metric}`), this.value(metric, value));
+      }),
+      ...shape === "bars" && line !== "none" && night?.[line] !== void 0 ? [
+        row(
+          line === "temperature" ? "var(--sleep-temperature)" : "var(--sleep-humidity)",
+          this.text(`room.${line}`),
+          this.roomValue(line, night[line])
+        )
+      ] : []
+    ];
+    const side = hovered.flip ? `right: ${hovered.x}px` : `left: ${hovered.x}px`;
+    return b2`<div class="tip" style="${side}; top: ${hovered.top}px">
+            <div class="tip-date">${this.weekdayLabel(day.date)} ${this.dayLabel(day.date)}</div>
+            ${rows}
+        </div>`;
+  }
+  /** A metric's colour by its level, or the score's own. */
+  color(metric, value) {
+    const mark = metric === "score" ? void 0 : level(metric, value, this.limits());
+    return mark ? LEVEL_COLORS[mark] : "var(--sleep-score)";
+  }
   barsOf(days, metric) {
-    const limits = this.limits();
-    return days.map(({ date, night }) => {
+    return days.map(({ night }) => {
       const value = metricValue(night, metric);
-      const mark = metric === "score" ? void 0 : level(metric, value, limits);
       return {
         value,
-        color: mark ? LEVEL_COLORS[mark] : "var(--sleep-score)",
-        tooltip: `${this.dayLabel(date)} \xB7 ${this.text(`metric.${metric}`)} ${this.value(metric, value)}`
+        color: this.color(metric, value)
       };
     });
   }
@@ -2022,6 +2097,9 @@ var ResmedMyairSleepCard = class extends i4 {
       /* @__PURE__ */ new Date(`${date}T00:00:00Z`)
     );
   }
+  weekdayLabel(date) {
+    return new Intl.DateTimeFormat(this.language(), { timeZone: "UTC", weekday: "short" }).format(/* @__PURE__ */ new Date(`${date}T00:00:00Z`));
+  }
   monthLabel(date) {
     return new Intl.DateTimeFormat(this.language(), { timeZone: "UTC", month: "long", year: "numeric" }).format(
       /* @__PURE__ */ new Date(`${date}T00:00:00Z`)
@@ -2097,6 +2175,7 @@ var ResmedMyairSleepCard = class extends i4 {
                     display: flex;
                     flex-direction: column;
                     container-type: inline-size;
+                    position: relative;
                 }
                 .card {
                     display: flex;
@@ -2195,6 +2274,56 @@ var ResmedMyairSleepCard = class extends i4 {
                     stroke: var(--ha-card-background, var(--card-background-color));
                     stroke-width: 3px;
                     stroke-linejoin: round;
+                }
+                svg .hit {
+                    fill: transparent;
+                }
+                svg .hover {
+                    fill: var(--primary-text-color);
+                    fill-opacity: 0.1;
+                }
+                svg .halo {
+                    fill: none;
+                    stroke: var(--ha-card-background, var(--card-background-color));
+                    stroke-width: 6px;
+                    stroke-linejoin: round;
+                    stroke-opacity: 0.85;
+                }
+                svg .dot {
+                    stroke: var(--ha-card-background, var(--card-background-color));
+                    stroke-width: 1.2px;
+                }
+                .tip {
+                    position: absolute;
+                    z-index: 1;
+                    pointer-events: none;
+                    padding: 6px 10px;
+                    border: 1px solid var(--divider-color);
+                    border-radius: 8px;
+                    background: var(--ha-card-background, var(--card-background-color));
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+                    font-size: 12px;
+                    line-height: 1.5;
+                    white-space: nowrap;
+                    color: var(--primary-text-color);
+                }
+                .tip-date {
+                    font-weight: 500;
+                }
+                .tip-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+                .tip-dot {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                }
+                .tip-value {
+                    margin-left: auto;
+                    padding-left: 12px;
+                    font-variant-numeric: tabular-nums;
                 }
                 svg .session {
                     fill: color-mix(in srgb, var(--sleep-score) 35%, transparent);
@@ -2408,6 +2537,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ResmedMyairSleepCard.prototype, "held", 2);
+__decorateClass([
+  r5()
+], ResmedMyairSleepCard.prototype, "hovered", 2);
 function px(value) {
   return Number.parseFloat(value) || 0;
 }

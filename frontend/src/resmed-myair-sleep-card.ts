@@ -6,7 +6,7 @@ import { LitElement, css, html, nothing } from "lit";
 import type { CSSResultGroup, PropertyValues, TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 
-import { barChart, scatter, timeline } from "./charts";
+import { barChart, scatter, timeline, tooltipPosition } from "./charts";
 import type { Bar } from "./charts";
 import { CARD_VERSION } from "./const";
 import {
@@ -116,6 +116,8 @@ export class ResmedMyairSleepCard extends LitElement {
     @state() private filled = 0;
     /** A card held to a limit it would grow past, in pixels. */
     @state() private held = 0;
+    /** The night under the pointer in a bar chart, and where its tooltip goes in the card. */
+    @state() private hovered?: { index: number; x: number; top: number; flip: boolean };
     private fetchedFor?: string;
     private retry?: number;
     private frame?: number;
@@ -230,7 +232,10 @@ export class ResmedMyairSleepCard extends LitElement {
         const classes = [held ? "held" : "", this.chartHeight() === undefined ? "spread" : ""].join(" ");
         return html`
             <ha-card class=${classes} style=${this.cardStyle()}>
-                <div class="card">${this.nights && this.width ? this.content(view) : nothing}</div>
+                <div class="card" @pointermove=${this.hover} @pointerdown=${this.hover} @pointerleave=${this.unhover}>
+                    ${this.nights && this.width ? this.content(view) : nothing}
+                </div>
+                ${this.tooltip()}
             </ha-card>
         `;
     }
@@ -243,7 +248,7 @@ export class ResmedMyairSleepCard extends LitElement {
             this.resizes?.observe(card);
             this.observed = card;
         }
-        if (![...changed.keys()].every((key) => ["extra", "gap", "filled", "held"].includes(String(key)))) {
+        if (![...changed.keys()].every((key) => ["extra", "gap", "filled", "held", "hovered"].includes(String(key)))) {
             this.measureSoon();
         }
         const calendar = this.renderRoot.querySelector(".scroller.calendar");
@@ -490,6 +495,7 @@ export class ResmedMyairSleepCard extends LitElement {
                 ${barChart(this.barsOf(days, metric), {
                     width: this.width,
                     height,
+                    hovered: this.hovered?.index,
                     goal: this.goal(metric),
                     dates: this.dateLabels(days.map(({ date }) => date)),
                     line:
@@ -526,6 +532,7 @@ export class ResmedMyairSleepCard extends LitElement {
                         ${barChart(this.barsOf(days, metric), {
                             width: this.width,
                             height: height + (index === METRICS.length - 1 ? 16 : 0),
+                            hovered: this.hovered?.index,
                             goal: this.goal(metric),
                             dates: index === METRICS.length - 1 ? this.dateLabels(days.map(({ date }) => date)) : undefined,
                             number: (value) => this.number(value, value % 1 ? 1 : 0),
@@ -687,15 +694,82 @@ export class ResmedMyairSleepCard extends LitElement {
         `;
     }
 
+    /** A bar chart's night under the pointer. A touch keeps its tooltip until the next touch elsewhere. */
+    private readonly hover = (event: PointerEvent): void => {
+        const target = event.target as SVGElement;
+        const card = this.renderRoot.querySelector<HTMLElement>("ha-card");
+        if (!target.classList?.contains("hit") || !card) {
+            this.hovered = undefined;
+            return;
+        }
+        // The chart is the card's first svg in the views that have hover columns.
+        const chart = card.querySelector("svg")?.getBoundingClientRect() ?? target.getBoundingClientRect();
+        const position = tooltipPosition(target.getBoundingClientRect(), card.getBoundingClientRect(), chart.top, drawnScale(card));
+        const index = Number(target.dataset.index);
+        if (this.hovered?.index !== index || this.hovered.flip !== position.flip) {
+            this.hovered = { index, ...position };
+        }
+    };
+
+    private readonly unhover = (event: PointerEvent): void => {
+        if (event.pointerType !== "touch") {
+            this.hovered = undefined;
+        }
+    };
+
+    /** The hovered night's date and values: the shown metric with the room's line, or all four beside the small charts. */
+    private tooltip(): TemplateResult | typeof nothing {
+        const hovered = this.hovered;
+        const shape = this.shape();
+        if (!hovered || !this.nights || (shape !== "bars" && shape !== "charts")) {
+            return nothing;
+        }
+        const day = nightsIn(this.nights, windowEnd(this.nights, this.today()), this.days())[hovered.index];
+        if (!day) {
+            return nothing;
+        }
+        const night = day.night;
+        const line = this.line();
+        const row = (color: string, label: string, value: string) =>
+            html`<div class="tip-row">
+                <span class="tip-dot" style="background: ${color}"></span>${label}<span class="tip-value">${value}</span>
+            </div>`;
+        const rows = !used(night)
+            ? [html`<div class="muted">${this.text("calendar.unused")}</div>`]
+            : [
+                  ...(shape === "charts" ? METRICS : [this.metric()]).map((metric) => {
+                      const value = metricValue(night, metric);
+                      return row(this.color(metric, value), this.text(`metric.${metric}`), this.value(metric, value));
+                  }),
+                  ...(shape === "bars" && line !== "none" && night?.[line] !== undefined
+                      ? [
+                            row(
+                                line === "temperature" ? "var(--sleep-temperature)" : "var(--sleep-humidity)",
+                                this.text(`room.${line}`),
+                                this.roomValue(line, night[line]),
+                            ),
+                        ]
+                      : []),
+              ];
+        const side = hovered.flip ? `right: ${hovered.x}px` : `left: ${hovered.x}px`;
+        return html`<div class="tip" style="${side}; top: ${hovered.top}px">
+            <div class="tip-date">${this.weekdayLabel(day.date)} ${this.dayLabel(day.date)}</div>
+            ${rows}
+        </div>`;
+    }
+
+    /** A metric's colour by its level, or the score's own. */
+    private color(metric: Metric, value: number | undefined): string {
+        const mark = metric === "score" ? undefined : level(metric, value, this.limits());
+        return mark ? LEVEL_COLORS[mark] : "var(--sleep-score)";
+    }
+
     private barsOf(days: { date: string; night?: Night }[], metric: Metric): Bar[] {
-        const limits = this.limits();
-        return days.map(({ date, night }) => {
+        return days.map(({ night }) => {
             const value = metricValue(night, metric);
-            const mark = metric === "score" ? undefined : level(metric, value, limits);
             return {
                 value,
-                color: mark ? LEVEL_COLORS[mark] : "var(--sleep-score)",
-                tooltip: `${this.dayLabel(date)} · ${this.text(`metric.${metric}`)} ${this.value(metric, value)}`,
+                color: this.color(metric, value),
             };
         });
     }
@@ -895,6 +969,10 @@ export class ResmedMyairSleepCard extends LitElement {
         );
     }
 
+    private weekdayLabel(date: string): string {
+        return new Intl.DateTimeFormat(this.language(), { timeZone: "UTC", weekday: "short" }).format(new Date(`${date}T00:00:00Z`));
+    }
+
     private monthLabel(date: string): string {
         return new Intl.DateTimeFormat(this.language(), { timeZone: "UTC", month: "long", year: "numeric" }).format(
             new Date(`${date}T00:00:00Z`),
@@ -979,6 +1057,7 @@ export class ResmedMyairSleepCard extends LitElement {
                     display: flex;
                     flex-direction: column;
                     container-type: inline-size;
+                    position: relative;
                 }
                 .card {
                     display: flex;
@@ -1077,6 +1156,56 @@ export class ResmedMyairSleepCard extends LitElement {
                     stroke: var(--ha-card-background, var(--card-background-color));
                     stroke-width: 3px;
                     stroke-linejoin: round;
+                }
+                svg .hit {
+                    fill: transparent;
+                }
+                svg .hover {
+                    fill: var(--primary-text-color);
+                    fill-opacity: 0.1;
+                }
+                svg .halo {
+                    fill: none;
+                    stroke: var(--ha-card-background, var(--card-background-color));
+                    stroke-width: 6px;
+                    stroke-linejoin: round;
+                    stroke-opacity: 0.85;
+                }
+                svg .dot {
+                    stroke: var(--ha-card-background, var(--card-background-color));
+                    stroke-width: 1.2px;
+                }
+                .tip {
+                    position: absolute;
+                    z-index: 1;
+                    pointer-events: none;
+                    padding: 6px 10px;
+                    border: 1px solid var(--divider-color);
+                    border-radius: 8px;
+                    background: var(--ha-card-background, var(--card-background-color));
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+                    font-size: 12px;
+                    line-height: 1.5;
+                    white-space: nowrap;
+                    color: var(--primary-text-color);
+                }
+                .tip-date {
+                    font-weight: 500;
+                }
+                .tip-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+                .tip-dot {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                }
+                .tip-value {
+                    margin-left: auto;
+                    padding-left: 12px;
+                    font-variant-numeric: tabular-nums;
                 }
                 svg .session {
                     fill: color-mix(in srgb, var(--sleep-score) 35%, transparent);

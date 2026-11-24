@@ -1,4 +1,4 @@
-/** The card's charts, drawn as SVG at the width they are given. Each mark carries its value as a tooltip. */
+/** The card's charts, drawn as SVG at the width they are given. A bar chart's nights are hover columns for the card's tooltip, the scatter's dots carry theirs. */
 import { nothing, svg } from "lit";
 import type { SVGTemplateResult } from "lit";
 
@@ -10,7 +10,6 @@ const TOP = 6;
 export interface Bar {
     value?: number;
     color: string;
-    tooltip: string;
 }
 
 export interface Line {
@@ -27,6 +26,8 @@ export interface BarOptions {
     /** Labels under some of the bars, by their index. */
     dates?: Map<number, string>;
     line?: Line;
+    /** The night under the pointer, whose column is lit. */
+    hovered?: number;
     number(value: number): string;
 }
 
@@ -39,7 +40,7 @@ function roundTop(value: number): number {
 }
 
 export function barChart(bars: Bar[], options: BarOptions): SVGTemplateResult {
-    const { width, height, goal, dates, line } = options;
+    const { width, height, goal, dates, line, hovered } = options;
     const right = line ? 30 : 4;
     const bottom = dates ? BOTTOM : 2;
     const values = bars.flatMap((bar) => (bar.value === undefined ? [] : [bar.value]));
@@ -53,11 +54,13 @@ export function barChart(bars: Bar[], options: BarOptions): SVGTemplateResult {
             (tick) => svg`<line class="grid ${tick ? "dashed" : ""}" x1=${LEFT} x2=${width - right} y1=${y(tick)} y2=${y(tick)}></line>
                 <text class="axis" x=${LEFT - 5} y=${y(tick) + 3} text-anchor="end">${options.number(tick)}</text>`,
         )}
+        ${hovered === undefined || hovered >= bars.length ? nothing : svg`<rect class="hover" x=${LEFT + hovered * slot} y=${TOP} width=${slot} height=${plot}></rect>`}
         ${bars.map((bar, index) =>
             bar.value === undefined
                 ? nothing
                 : svg`<rect x=${LEFT + index * slot + (slot - barWidth) / 2} y=${y(bar.value)} width=${barWidth}
-                      height=${Math.max(1, TOP + plot - y(bar.value))} rx=${Math.min(2, barWidth / 3)} fill=${bar.color}><title>${bar.tooltip}</title></rect>`,
+                      height=${Math.max(1, TOP + plot - y(bar.value))} rx=${Math.min(2, barWidth / 3)} fill=${bar.color}
+                      fill-opacity=${line ? 0.5 : 1}></rect>`,
         )}
         ${
             goal
@@ -74,7 +77,27 @@ export function barChart(bars: Bar[], options: BarOptions): SVGTemplateResult {
                   )
                 : nothing
         }
+        ${bars.map((_, index) => svg`<rect class="hit" data-index=${index} x=${LEFT + index * slot} y=${TOP} width=${slot} height=${plot}></rect>`)}
     </svg>`;
+}
+
+export interface Box {
+    left: number;
+    top: number;
+    width: number;
+}
+
+/**
+ * Where a hovered column's tooltip goes in the card, in the card's own pixels when it is drawn at `scale`: half a column
+ * beside the column, on its right in the card's left half and, as `x` from the card's right edge, on its left in the
+ * right half, level with the chart's top.
+ */
+export function tooltipPosition(column: Box, card: Box, chartTop: number, scale: number): { x: number; top: number; flip: boolean } {
+    const middle = (column.left + column.width / 2 - card.left) / scale;
+    const width = card.width / scale;
+    const flip = middle > width / 2;
+    const gap = column.width / scale;
+    return { x: flip ? width - middle + gap : middle + gap, top: (chartTop - card.top) / scale, flip };
 }
 
 /** A line over the bars on a scale of its own, from a step under its least value to a step over its most. */
@@ -97,8 +120,12 @@ function lineOver(line: Line, frame: { width: number; right: number; plot: numbe
         path += `${drawing ? "L" : "M"}${x(index).toFixed(1)},${y(value).toFixed(1)}`;
         drawing = true;
     });
-    return svg`<path d=${path} fill="none" stroke=${line.color} stroke-width="2"></path>
-        ${line.values.map((value, index) => (value === undefined ? nothing : svg`<circle cx=${x(index)} cy=${y(value)} r="2.2" fill=${line.color}></circle>`))}
+    // Drawn over a halo of the card's background, so it stands apart from the bars under it.
+    return svg`<path class="halo" d=${path}></path>
+        <path d=${path} fill="none" stroke=${line.color} stroke-width="2.5" stroke-linejoin="round"></path>
+        ${line.values.map((value, index) =>
+            value === undefined ? nothing : svg`<circle class="dot" cx=${x(index)} cy=${y(value)} r="2.6" fill=${line.color}></circle>`,
+        )}
         ${[low, high].map(
             (value) =>
                 svg`<text class="axis" x=${frame.width - frame.right + 4} y=${y(value) + 3} fill=${line.color}>${line.label(value)}</text>`,
