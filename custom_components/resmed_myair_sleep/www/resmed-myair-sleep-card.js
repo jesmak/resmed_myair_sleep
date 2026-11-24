@@ -1927,10 +1927,13 @@ var ResmedMyairSleepCard = class extends i4 {
     this.filled = filled;
     this.grow(chart, chart === void 0 ? 0 : spareRoom(filled, own));
   }
-  /** Gives a chart `extra` pixels over its own height, of which the first widen its gaps above and below, up to 20 px each. */
+  /**
+   * Gives a chart `extra` pixels over its own height, of which the first widen its gaps above and below, up to 20 px
+   * each. The small charts have no gaps of their own and take it all.
+   */
   grow(chart, extra) {
-    if (chart === void 0) {
-      this.extra = 0;
+    if (chart === void 0 || this.shape() === "charts") {
+      this.extra = chart === void 0 ? 0 : extra;
       this.gap = 0;
       return;
     }
@@ -1954,7 +1957,10 @@ var ResmedMyairSleepCard = class extends i4 {
       0
     );
     const gaps = (parts.length - 1) * px(getComputedStyle(inner).rowGap);
-    const heights = parts.reduce((sum, part) => sum + part.getBoundingClientRect().height / scale, 0);
+    const heights = parts.reduce((sum, part) => {
+      const style = getComputedStyle(part);
+      return sum + part.getBoundingClientRect().height / scale + px(style.marginTop) + px(style.marginBottom);
+    }, 0);
     return heights + hidden + gaps + px(getComputedStyle(inner).paddingTop) + px(getComputedStyle(inner).paddingBottom) + px(getComputedStyle(card).borderTopWidth) + px(getComputedStyle(card).borderBottomWidth);
   }
   /** The height the card is held to, or undefined while it takes its content's. A card growing up to a limit is held once its content passes it. */

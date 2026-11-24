@@ -779,10 +779,13 @@ export class ResmedMyairSleepCard extends LitElement {
         this.grow(chart, chart === undefined ? 0 : spareRoom(filled, own));
     }
 
-    /** Gives a chart `extra` pixels over its own height, of which the first widen its gaps above and below, up to 20 px each. */
+    /**
+     * Gives a chart `extra` pixels over its own height, of which the first widen its gaps above and below, up to 20 px
+     * each. The small charts have no gaps of their own and take it all.
+     */
     private grow(chart: number | undefined, extra: number): void {
-        if (chart === undefined) {
-            this.extra = 0;
+        if (chart === undefined || this.shape() === "charts") {
+            this.extra = chart === undefined ? 0 : extra;
             this.gap = 0;
             return;
         }
@@ -807,7 +810,11 @@ export class ResmedMyairSleepCard extends LitElement {
             0,
         );
         const gaps = (parts.length - 1) * px(getComputedStyle(inner).rowGap);
-        const heights = parts.reduce((sum, part) => sum + part.getBoundingClientRect().height / scale, 0);
+        // A chart's gaps are its margins, which the drawn rectangle leaves out.
+        const heights = parts.reduce((sum, part) => {
+            const style = getComputedStyle(part);
+            return sum + part.getBoundingClientRect().height / scale + px(style.marginTop) + px(style.marginBottom);
+        }, 0);
         return (
             heights +
             hidden +
