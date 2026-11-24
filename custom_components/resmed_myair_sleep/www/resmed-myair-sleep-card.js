@@ -1226,6 +1226,10 @@ function filledHeight(content, config, limit = Infinity) {
 function spareRoom(filled, content) {
   return Math.max(0, Math.floor(filled - content + SLACK_PX));
 }
+function heldSpare(held, content) {
+  const spare = spareRoom(held, content);
+  return spare < ROW_PX ? spare : 0;
+}
 function fillLimit(config, layout, minimum = 0) {
   const rows = config.grid_options ? config.grid_options.rows : config.layout_options?.grid_rows;
   if (layout !== "grid" || typeof rows === "number") {
@@ -1427,6 +1431,7 @@ var ResmedMyairSleepCard = class extends i4 {
     this.gap = 0;
     this.filled = 0;
     this.held = 0;
+    this.heldSpread = false;
     this.resizes = typeof ResizeObserver === "undefined" ? void 0 : new ResizeObserver(() => this.measureSoon());
     /** A bar chart's night under the pointer. A touch keeps its tooltip until the next touch elsewhere. */
     this.hover = (event) => {
@@ -1533,7 +1538,8 @@ var ResmedMyairSleepCard = class extends i4 {
     }
     const held = this.isHeld();
     const view = this.view();
-    const classes = [held ? "held" : "", this.chartHeight() === void 0 ? "spread" : ""].join(" ");
+    const spread = this.chartHeight() === void 0 && (!held || this.heldSpread);
+    const classes = [held ? "held" : "", spread ? "spread" : ""].join(" ");
     return b2`
             <ha-card class=${classes} style=${this.cardStyle()}>
                 <div class="card" @pointermove=${this.hover} @pointerdown=${this.hover} @pointerleave=${this.unhover}>
@@ -1551,7 +1557,7 @@ var ResmedMyairSleepCard = class extends i4 {
       this.resizes?.observe(card);
       this.observed = card;
     }
-    if (![...changed.keys()].every((key) => ["extra", "gap", "filled", "held", "hovered"].includes(String(key)))) {
+    if (![...changed.keys()].every((key) => ["extra", "gap", "filled", "held", "heldSpread", "hovered"].includes(String(key)))) {
       this.measureSoon();
     }
     const calendar = this.renderRoot.querySelector(".scroller.calendar");
@@ -2047,6 +2053,7 @@ var ResmedMyairSleepCard = class extends i4 {
     const room = this.heldRoom(card, content);
     if (room !== void 0) {
       this.filled = 0;
+      this.heldSpread = chart === void 0 && heldSpare(room, content) > 0;
       if (chart !== void 0) {
         const least = this.shape() === "charts" ? 4 * MIN_SMALL_CHART : MIN_CHART;
         const extra = Math.max(least - chart, this.extra + Math.floor(room - content));
@@ -2054,6 +2061,7 @@ var ResmedMyairSleepCard = class extends i4 {
       }
       return;
     }
+    this.heldSpread = false;
     const limit = fillLimit(this.config, this.layout, this.minimum());
     if (!limit) {
       this.filled = 0;
@@ -2081,7 +2089,8 @@ var ResmedMyairSleepCard = class extends i4 {
   }
   /**
    * The content's height as drawn: from the card's top to the end of its last part, with the card's padding and
-   * border under it. A part that scrolls counts at its whole height, so a held card knows what it would need.
+   * border under it. A part that scrolls counts to the end of its content, however far it is scrolled and however
+   * tall it has grown, so a held card knows what it would need.
    */
   contentHeight(card, inner) {
     const parts = [...inner.querySelectorAll(":scope > .part")];
@@ -2090,16 +2099,21 @@ var ResmedMyairSleepCard = class extends i4 {
       return void 0;
     }
     const scale = drawnScale(card);
-    const hidden = parts.reduce(
-      (sum, part) => sum + (part.classList.contains("scroller") ? part.scrollHeight - part.clientHeight : 0),
-      0
-    );
     const gaps = (parts.length - 1) * px(getComputedStyle(inner).rowGap);
     const heights = parts.reduce((sum, part) => {
       const style = getComputedStyle(part);
-      return sum + part.getBoundingClientRect().height / scale + px(style.marginTop) + px(style.marginBottom);
+      return sum + this.partHeight(part, style, scale) + px(style.marginTop) + px(style.marginBottom);
     }, 0);
-    return heights + hidden + gaps + px(getComputedStyle(inner).paddingTop) + px(getComputedStyle(inner).paddingBottom) + px(getComputedStyle(card).borderTopWidth) + px(getComputedStyle(card).borderBottomWidth);
+    return heights + gaps + px(getComputedStyle(inner).paddingTop) + px(getComputedStyle(inner).paddingBottom) + px(getComputedStyle(card).borderTopWidth) + px(getComputedStyle(card).borderBottomWidth);
+  }
+  /** A part's height, a part that scrolls to the end of its content rather than its own edge. */
+  partHeight(part, style, scale) {
+    const box = part.getBoundingClientRect();
+    if (!part.classList.contains("scroller")) {
+      return box.height / scale;
+    }
+    const end = Math.max(box.top, ...[...part.children].map((child) => child.getBoundingClientRect().bottom));
+    return (end - box.top) / scale + part.scrollTop + px(style.paddingBottom);
   }
   /** The height the card is held to, or undefined while it takes its content's. A card growing up to a limit is held once its content passes it. */
   heldRoom(card, content) {
@@ -2249,7 +2263,7 @@ var ResmedMyairSleepCard = class extends i4 {
                     padding: 16px;
                     min-height: 0;
                 }
-                ha-card.spread:not(.held) .card {
+                ha-card.spread .card {
                     justify-content: space-between;
                 }
                 ha-card.held .card {
@@ -2259,6 +2273,9 @@ var ResmedMyairSleepCard = class extends i4 {
                     flex: 1 1 0;
                     min-height: 0;
                     overflow-y: auto;
+                }
+                ha-card.held.spread .scroller {
+                    flex: none;
                 }
                 .chart {
                     margin: var(--sleep-gap, 0px) 0;
@@ -2600,6 +2617,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ResmedMyairSleepCard.prototype, "held", 2);
+__decorateClass([
+  r5()
+], ResmedMyairSleepCard.prototype, "heldSpread", 2);
 __decorateClass([
   r5()
 ], ResmedMyairSleepCard.prototype, "hovered", 2);

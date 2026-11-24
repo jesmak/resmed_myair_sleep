@@ -29,7 +29,7 @@ import { ScrollFade, fadeStyles, scrollIndicator, validScrollIndicator } from ".
 import type { HomeAssistant } from "./hass";
 import { gridMinRows, heightCardSize, heightMode, heightStyle, validHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
-import { drawnScale, fillLimit, filledHeight, filledStyle, spareRoom, validRowStep } from "./rows";
+import { drawnScale, fillLimit, filledHeight, filledStyle, heldSpare, spareRoom, validRowStep } from "./rows";
 import type { Limits, Metric, Night, NightsChart, Room, RoomChart, SleepCardConfig, View } from "./types";
 
 const VIEWS: View[] = ["last_night", "nights", "room"];
@@ -116,6 +116,8 @@ export class ResmedMyairSleepCard extends LitElement {
     @state() private filled = 0;
     /** A card held to a limit it would grow past, in pixels. */
     @state() private held = 0;
+    /** A card of rows held less than a row taller than its content, which spreads its parts as on filled rows. */
+    @state() private heldSpread = false;
     /** The night under the pointer in a bar chart, and where its tooltip goes in the card. */
     @state() private hovered?: { index: number; x: number; top: number; flip: boolean };
     private fetchedFor?: string;
@@ -236,7 +238,8 @@ export class ResmedMyairSleepCard extends LitElement {
         }
         const held = this.isHeld();
         const view = this.view();
-        const classes = [held ? "held" : "", this.chartHeight() === undefined ? "spread" : ""].join(" ");
+        const spread = this.chartHeight() === undefined && (!held || this.heldSpread);
+        const classes = [held ? "held" : "", spread ? "spread" : ""].join(" ");
         return html`
             <ha-card class=${classes} style=${this.cardStyle()}>
                 <div class="card" @pointermove=${this.hover} @pointerdown=${this.hover} @pointerleave=${this.unhover}>
@@ -255,7 +258,7 @@ export class ResmedMyairSleepCard extends LitElement {
             this.resizes?.observe(card);
             this.observed = card;
         }
-        if (![...changed.keys()].every((key) => ["extra", "gap", "filled", "held", "hovered"].includes(String(key)))) {
+        if (![...changed.keys()].every((key) => ["extra", "gap", "filled", "held", "heldSpread", "hovered"].includes(String(key)))) {
             this.measureSoon();
         }
         const calendar = this.renderRoot.querySelector(".scroller.calendar");
@@ -839,6 +842,8 @@ export class ResmedMyairSleepCard extends LitElement {
         const room = this.heldRoom(card, content);
         if (room !== undefined) {
             this.filled = 0;
+            // Less than a row of room is placed as on filled rows, from a row up it goes into the part that scrolls.
+            this.heldSpread = chart === undefined && heldSpare(room, content) > 0;
             if (chart !== undefined) {
                 const least = this.shape() === "charts" ? 4 * MIN_SMALL_CHART : MIN_CHART;
                 // `content` was drawn with the chart's current room, which the chart gives back first.
@@ -847,6 +852,7 @@ export class ResmedMyairSleepCard extends LitElement {
             }
             return;
         }
+        this.heldSpread = false;
         const limit = fillLimit(this.config, this.layout, this.minimum());
         if (!limit) {
             this.filled = 0;
@@ -877,7 +883,8 @@ export class ResmedMyairSleepCard extends LitElement {
 
     /**
      * The content's height as drawn: from the card's top to the end of its last part, with the card's padding and
-     * border under it. A part that scrolls counts at its whole height, so a held card knows what it would need.
+     * border under it. A part that scrolls counts to the end of its content, however far it is scrolled and however
+     * tall it has grown, so a held card knows what it would need.
      */
     private contentHeight(card: HTMLElement, inner: HTMLElement): number | undefined {
         const parts = [...inner.querySelectorAll<HTMLElement>(":scope > .part")];
@@ -886,25 +893,30 @@ export class ResmedMyairSleepCard extends LitElement {
             return undefined;
         }
         const scale = drawnScale(card);
-        const hidden = parts.reduce(
-            (sum, part) => sum + (part.classList.contains("scroller") ? part.scrollHeight - part.clientHeight : 0),
-            0,
-        );
         const gaps = (parts.length - 1) * px(getComputedStyle(inner).rowGap);
         // A chart's gaps are its margins, which the drawn rectangle leaves out.
         const heights = parts.reduce((sum, part) => {
             const style = getComputedStyle(part);
-            return sum + part.getBoundingClientRect().height / scale + px(style.marginTop) + px(style.marginBottom);
+            return sum + this.partHeight(part, style, scale) + px(style.marginTop) + px(style.marginBottom);
         }, 0);
         return (
             heights +
-            hidden +
             gaps +
             px(getComputedStyle(inner).paddingTop) +
             px(getComputedStyle(inner).paddingBottom) +
             px(getComputedStyle(card).borderTopWidth) +
             px(getComputedStyle(card).borderBottomWidth)
         );
+    }
+
+    /** A part's height, a part that scrolls to the end of its content rather than its own edge. */
+    private partHeight(part: HTMLElement, style: CSSStyleDeclaration, scale: number): number {
+        const box = part.getBoundingClientRect();
+        if (!part.classList.contains("scroller")) {
+            return box.height / scale;
+        }
+        const end = Math.max(box.top, ...[...part.children].map((child) => child.getBoundingClientRect().bottom));
+        return (end - box.top) / scale + part.scrollTop + px(style.paddingBottom);
     }
 
     /** The height the card is held to, or undefined while it takes its content's. A card growing up to a limit is held once its content passes it. */
@@ -1075,7 +1087,7 @@ export class ResmedMyairSleepCard extends LitElement {
                     padding: 16px;
                     min-height: 0;
                 }
-                ha-card.spread:not(.held) .card {
+                ha-card.spread .card {
                     justify-content: space-between;
                 }
                 ha-card.held .card {
@@ -1085,6 +1097,9 @@ export class ResmedMyairSleepCard extends LitElement {
                     flex: 1 1 0;
                     min-height: 0;
                     overflow-y: auto;
+                }
+                ha-card.held.spread .scroller {
+                    flex: none;
                 }
                 .chart {
                     margin: var(--sleep-gap, 0px) 0;
