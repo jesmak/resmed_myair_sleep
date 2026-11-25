@@ -137,6 +137,8 @@ export interface Point {
     y: number;
     color: string;
     tooltip: string;
+    /** Left undrawn, while the axes still make room for it. */
+    hidden?: boolean;
 }
 
 export interface ScatterOptions {
@@ -146,17 +148,20 @@ export interface ScatterOptions {
     step: number;
     goal?: number;
     xTitle: string;
+    yTitle: string;
     number(value: number): string;
 }
 
 export function scatter(points: Point[], options: ScatterOptions): SVGTemplateResult {
     const { width, height, step } = options;
     const bottom = BOTTOM + 14;
+    const left = LEFT + 12;
+    const middle = TOP + (height - TOP - bottom) / 2;
     const xs = points.map((point) => point.x);
     const low = Math.floor(Math.min(...xs) - step / 2);
     const high = Math.ceil(Math.max(...xs) + step / 2);
     const top = roundTop(Math.max(options.goal ? options.goal * 1.6 : 0, ...points.map((point) => point.y)));
-    const x = (value: number): number => LEFT + ((value - low) / (high - low)) * (width - LEFT - 8);
+    const x = (value: number): number => left + ((value - low) / (high - low)) * (width - left - 8);
     const y = (value: number): number => TOP + (1 - value / top) * (height - TOP - bottom);
     const ticks: number[] = [];
     for (let tick = Math.ceil(low / step) * step; tick <= high; tick += step) {
@@ -164,16 +169,19 @@ export function scatter(points: Point[], options: ScatterOptions): SVGTemplateRe
     }
     return svg`<svg width=${width} height=${height} role="img">
         ${[0, top / 4, top / 2, (top * 3) / 4, top].map(
-            (tick) => svg`<line class="grid dashed" x1=${LEFT} x2=${width - 8} y1=${y(tick)} y2=${y(tick)}></line>
-                <text class="axis" x=${LEFT - 5} y=${y(tick) + 3} text-anchor="end">${options.number(tick)}</text>`,
+            (tick) => svg`<line class="grid dashed" x1=${left} x2=${width - 8} y1=${y(tick)} y2=${y(tick)}></line>
+                <text class="axis" x=${left - 5} y=${y(tick) + 3} text-anchor="end">${options.number(tick)}</text>`,
         )}
         ${ticks.map((tick) => svg`<text class="axis" x=${x(tick)} y=${height - bottom + 14} text-anchor="middle">${options.number(tick)}</text>`)}
-        <text class="axis" x=${(width + LEFT) / 2} y=${height - 3} text-anchor="middle">${options.xTitle}</text>
-        ${options.goal === undefined ? nothing : svg`<line class="goal" x1=${LEFT} x2=${width - 8} y1=${y(options.goal)} y2=${y(options.goal)}></line>`}
-        ${points.map(
-            (point) =>
-                svg`<circle cx=${x(point.x)} cy=${y(point.y)} r="4.5" fill=${point.color} fill-opacity="0.85"><title>${point.tooltip}</title></circle>`,
-        )}
+        <text class="axis" transform="translate(9 ${middle}) rotate(-90)" text-anchor="middle">${options.yTitle}</text>
+        <text class="axis" x=${(width + left) / 2} y=${height - 3} text-anchor="middle">${options.xTitle}</text>
+        ${options.goal === undefined ? nothing : svg`<line class="goal" x1=${left} x2=${width - 8} y1=${y(options.goal)} y2=${y(options.goal)}></line>`}
+        ${points
+            .filter((point) => !point.hidden)
+            .map(
+                (point) =>
+                    svg`<circle cx=${x(point.x)} cy=${y(point.y)} r="4.5" fill=${point.color} fill-opacity="0.85"><title>${point.tooltip}</title></circle>`,
+            )}
     </svg>`;
 }
 

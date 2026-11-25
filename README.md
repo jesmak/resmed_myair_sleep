@@ -156,7 +156,8 @@ The integration comes with a dashboard card for one machine, with three views to
   the score, or as a calendar coloured by one figure, its newest month first, with the 30-day compliance at the top.
 - **Sleep and the room** shows how AHI goes with the bedroom's temperature or humidity over the nights that have them.
   It can be drawn as the average AHI for each degree or each 5 % of humidity, or as a dot for each night, coloured by
-  its mask leak.
+  its mask leak. Clicking a colour in the dots' legend hides the nights of that colour, and clicking it again shows
+  them.
 
 A night with no use, or no data at all, counts as unused. The colours follow the limits. AHI is good below
 `ahi_limit`, high from it and bad from twice it. Leak is good below `leak_limit` and bad from 5/3 of

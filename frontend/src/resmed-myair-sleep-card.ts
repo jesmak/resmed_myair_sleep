@@ -106,7 +106,7 @@ export class ResmedMyairSleepCard extends LitElement {
     @state() private nights?: Night[];
     @state() private error?: string;
     /** What the viewer picked on the card itself, over the config's starting choice. */
-    @state() private picked: { metric?: Metric; line?: Room | "none"; room?: Room } = {};
+    @state() private picked: { metric?: Metric; line?: Room | "none"; room?: Room; hidden?: Level[] } = {};
     /** The content's width, which the charts are drawn for. */
     @state() private width = 0;
     /** The room a chart has been given over its own height, or under it when held, and its gaps' growth. */
@@ -614,6 +614,21 @@ export class ResmedMyairSleepCard extends LitElement {
         const points = roomNights(this.windowNights(nights), room);
         const leak = limits.leak_limit;
         const most = Math.round((leak * 5) / 3);
+        const hidden = this.picked.hidden ?? [];
+        const leakLevel = (night: Night): Level => level("leak", night.leak, limits) ?? "good";
+        // A legend entry hides its nights' dots, and shows them again.
+        const entry = (value: Level, label: string): TemplateResult =>
+            html`<button
+                class="${value} ${hidden.includes(value) ? "off" : ""}"
+                aria-pressed=${!hidden.includes(value)}
+                @click=${() =>
+                    (this.picked = {
+                        ...this.picked,
+                        hidden: hidden.includes(value) ? hidden.filter((other) => other !== value) : [...hidden, value],
+                    })}
+            >
+                ${label}
+            </button>`;
         return html`
             ${this.head(this.text("view.room"), this.text("room.nights", { count: String(points.length) }))}
             ${this.chips(
@@ -629,7 +644,8 @@ export class ResmedMyairSleepCard extends LitElement {
                               points.map((night) => ({
                                   x: night[room] as number,
                                   y: night.ahi as number,
-                                  color: LEVEL_COLORS[level("leak", night.leak, limits) ?? "good"],
+                                  color: LEVEL_COLORS[leakLevel(night)],
+                                  hidden: hidden.includes(leakLevel(night)),
                                   tooltip: `${this.dayLabel(night.date)} · AHI ${this.number(night.ahi, 1)} · ${this.roomValue(room, night[room])} · ${this.text("metric.leak")} ${this.number(night.leak, 1)} L/min`,
                               })),
                               {
@@ -638,6 +654,7 @@ export class ResmedMyairSleepCard extends LitElement {
                                   step: roomStep(room),
                                   goal: limits.ahi_limit,
                                   xTitle: `${this.text(`room.${room}`)}, ${room === "temperature" ? this.temperatureUnit() : "%"}`,
+                                  yTitle: this.text("metric.ahi"),
                                   number: (value) => this.number(value, value % 1 ? 1 : 0),
                               },
                           )
@@ -645,9 +662,9 @@ export class ResmedMyairSleepCard extends LitElement {
                 }
             </div>
             <div class="legend part">
-                <span class="good">${this.text("room.leak_below", { value: this.number(leak, 0) })}</span>
-                <span class="high">${this.number(leak, 0)}–${this.number(most, 0)}</span>
-                <span class="bad">${this.text("room.leak_over", { value: this.number(most, 0) })}</span>
+                ${entry("good", this.text("room.leak_below", { value: this.number(leak, 0) }))}
+                ${entry("high", `${this.number(leak, 0)}–${this.number(most, 0)}`)}
+                ${entry("bad", this.text("room.leak_over", { value: this.number(most, 0) }))}
             </div>
         `;
     }
@@ -1341,7 +1358,20 @@ export class ResmedMyairSleepCard extends LitElement {
                     font-size: 11px;
                     color: var(--secondary-text-color);
                 }
-                .legend span::before {
+                .legend button {
+                    all: unset;
+                    cursor: pointer;
+                }
+                .legend button:focus-visible {
+                    outline: 2px solid var(--primary-color);
+                    outline-offset: 2px;
+                    border-radius: 4px;
+                }
+                .legend button.off {
+                    opacity: 0.45;
+                    text-decoration: line-through;
+                }
+                .legend > ::before {
                     content: "";
                     display: inline-block;
                     width: 9px;

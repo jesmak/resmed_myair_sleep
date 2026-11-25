@@ -674,11 +674,13 @@ function lineOver(line, frame) {
 function scatter(points, options) {
   const { width, height, step: step2 } = options;
   const bottom = BOTTOM + 14;
+  const left = LEFT + 12;
+  const middle = TOP + (height - TOP - bottom) / 2;
   const xs = points.map((point) => point.x);
   const low = Math.floor(Math.min(...xs) - step2 / 2);
   const high = Math.ceil(Math.max(...xs) + step2 / 2);
   const top = roundTop(Math.max(options.goal ? options.goal * 1.6 : 0, ...points.map((point) => point.y)));
-  const x2 = (value) => LEFT + (value - low) / (high - low) * (width - LEFT - 8);
+  const x2 = (value) => left + (value - low) / (high - low) * (width - left - 8);
   const y3 = (value) => TOP + (1 - value / top) * (height - TOP - bottom);
   const ticks = [];
   for (let tick = Math.ceil(low / step2) * step2; tick <= high; tick += step2) {
@@ -686,13 +688,14 @@ function scatter(points, options) {
   }
   return w`<svg width=${width} height=${height} role="img">
         ${[0, top / 4, top / 2, top * 3 / 4, top].map(
-    (tick) => w`<line class="grid dashed" x1=${LEFT} x2=${width - 8} y1=${y3(tick)} y2=${y3(tick)}></line>
-                <text class="axis" x=${LEFT - 5} y=${y3(tick) + 3} text-anchor="end">${options.number(tick)}</text>`
+    (tick) => w`<line class="grid dashed" x1=${left} x2=${width - 8} y1=${y3(tick)} y2=${y3(tick)}></line>
+                <text class="axis" x=${left - 5} y=${y3(tick) + 3} text-anchor="end">${options.number(tick)}</text>`
   )}
         ${ticks.map((tick) => w`<text class="axis" x=${x2(tick)} y=${height - bottom + 14} text-anchor="middle">${options.number(tick)}</text>`)}
-        <text class="axis" x=${(width + LEFT) / 2} y=${height - 3} text-anchor="middle">${options.xTitle}</text>
-        ${options.goal === void 0 ? A : w`<line class="goal" x1=${LEFT} x2=${width - 8} y1=${y3(options.goal)} y2=${y3(options.goal)}></line>`}
-        ${points.map(
+        <text class="axis" transform="translate(9 ${middle}) rotate(-90)" text-anchor="middle">${options.yTitle}</text>
+        <text class="axis" x=${(width + left) / 2} y=${height - 3} text-anchor="middle">${options.xTitle}</text>
+        ${options.goal === void 0 ? A : w`<line class="goal" x1=${left} x2=${width - 8} y1=${y3(options.goal)} y2=${y3(options.goal)}></line>`}
+        ${points.filter((point) => !point.hidden).map(
     (point) => w`<circle cx=${x2(point.x)} cy=${y3(point.y)} r="4.5" fill=${point.color} fill-opacity="0.85"><title>${point.tooltip}</title></circle>`
   )}
     </svg>`;
@@ -1872,6 +1875,18 @@ var ResmedMyairSleepCard = class extends i4 {
     const points = roomNights(this.windowNights(nights), room);
     const leak = limits.leak_limit;
     const most = Math.round(leak * 5 / 3);
+    const hidden = this.picked.hidden ?? [];
+    const leakLevel = (night) => level("leak", night.leak, limits) ?? "good";
+    const entry = (value, label) => b2`<button
+                class="${value} ${hidden.includes(value) ? "off" : ""}"
+                aria-pressed=${!hidden.includes(value)}
+                @click=${() => this.picked = {
+      ...this.picked,
+      hidden: hidden.includes(value) ? hidden.filter((other) => other !== value) : [...hidden, value]
+    }}
+            >
+                ${label}
+            </button>`;
     return b2`
             ${this.head(this.text("view.room"), this.text("room.nights", { count: String(points.length) }))}
             ${this.chips(
@@ -1885,7 +1900,8 @@ var ResmedMyairSleepCard = class extends i4 {
       points.map((night) => ({
         x: night[room],
         y: night.ahi,
-        color: LEVEL_COLORS[level("leak", night.leak, limits) ?? "good"],
+        color: LEVEL_COLORS[leakLevel(night)],
+        hidden: hidden.includes(leakLevel(night)),
         tooltip: `${this.dayLabel(night.date)} \xB7 AHI ${this.number(night.ahi, 1)} \xB7 ${this.roomValue(room, night[room])} \xB7 ${this.text("metric.leak")} ${this.number(night.leak, 1)} L/min`
       })),
       {
@@ -1894,14 +1910,15 @@ var ResmedMyairSleepCard = class extends i4 {
         step: roomStep(room),
         goal: limits.ahi_limit,
         xTitle: `${this.text(`room.${room}`)}, ${room === "temperature" ? this.temperatureUnit() : "%"}`,
+        yTitle: this.text("metric.ahi"),
         number: (value) => this.number(value, value % 1 ? 1 : 0)
       }
     ) : b2`<div class="muted empty" style="height: ${SCATTER_CHART + this.extra}px">${this.text("room.empty")}</div>`}
             </div>
             <div class="legend part">
-                <span class="good">${this.text("room.leak_below", { value: this.number(leak, 0) })}</span>
-                <span class="high">${this.number(leak, 0)}–${this.number(most, 0)}</span>
-                <span class="bad">${this.text("room.leak_over", { value: this.number(most, 0) })}</span>
+                ${entry("good", this.text("room.leak_below", { value: this.number(leak, 0) }))}
+                ${entry("high", `${this.number(leak, 0)}\u2013${this.number(most, 0)}`)}
+                ${entry("bad", this.text("room.leak_over", { value: this.number(most, 0) }))}
             </div>
         `;
   }
@@ -2518,7 +2535,20 @@ var ResmedMyairSleepCard = class extends i4 {
                     font-size: 11px;
                     color: var(--secondary-text-color);
                 }
-                .legend span::before {
+                .legend button {
+                    all: unset;
+                    cursor: pointer;
+                }
+                .legend button:focus-visible {
+                    outline: 2px solid var(--primary-color);
+                    outline-offset: 2px;
+                    border-radius: 4px;
+                }
+                .legend button.off {
+                    opacity: 0.45;
+                    text-decoration: line-through;
+                }
+                .legend > ::before {
                     content: "";
                     display: inline-block;
                     width: 9px;
