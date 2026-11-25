@@ -1560,11 +1560,6 @@ var ResmedMyairSleepCard = class extends i4 {
     if (![...changed.keys()].every((key) => ["extra", "gap", "filled", "held", "heldSpread", "hovered"].includes(String(key)))) {
       this.measureSoon();
     }
-    const calendar = this.renderRoot.querySelector(".scroller.calendar");
-    if (calendar && calendar !== this.scrolledCalendar && calendar.scrollHeight > calendar.clientHeight) {
-      calendar.scrollTop = calendar.scrollHeight;
-      this.scrolledCalendar = calendar;
-    }
   }
   // ---- Data ----
   async fetch() {
@@ -1817,7 +1812,7 @@ var ResmedMyairSleepCard = class extends i4 {
     const end = windowEnd(nights, this.today());
     const days = nightsIn(nights, end, this.days());
     const byDate = new Map(days.map((day) => [day.date, day.night]));
-    const months = [...new Set(days.map(({ date }) => date.slice(0, 7)))];
+    const months = [...new Set(days.map(({ date }) => date.slice(0, 7)))].reverse();
     const weekdays = Array.from(
       { length: 7 },
       (_2, index) => new Intl.DateTimeFormat(this.language(), { weekday: "narrow", timeZone: "UTC" }).format(new Date(Date.UTC(2024, 0, 1 + index)))

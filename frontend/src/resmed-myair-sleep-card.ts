@@ -125,8 +125,6 @@ export class ResmedMyairSleepCard extends LitElement {
     private frame?: number;
     private readonly resizes = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(() => this.measureSoon());
     private observed?: Element;
-    /** The calendar last scrolled to its newest month, so a user's own scrolling stays until the calendar is drawn anew. */
-    private scrolledCalendar?: Element;
 
     public constructor() {
         super();
@@ -260,11 +258,6 @@ export class ResmedMyairSleepCard extends LitElement {
         }
         if (![...changed.keys()].every((key) => ["extra", "gap", "filled", "held", "heldSpread", "hovered"].includes(String(key)))) {
             this.measureSoon();
-        }
-        const calendar = this.renderRoot.querySelector(".scroller.calendar");
-        if (calendar && calendar !== this.scrolledCalendar && calendar.scrollHeight > calendar.clientHeight) {
-            calendar.scrollTop = calendar.scrollHeight;
-            this.scrolledCalendar = calendar;
         }
     }
 
@@ -558,7 +551,8 @@ export class ResmedMyairSleepCard extends LitElement {
         const end = windowEnd(nights, this.today());
         const days = nightsIn(nights, end, this.days());
         const byDate = new Map(days.map((day) => [day.date, day.night]));
-        const months = [...new Set(days.map(({ date }) => date.slice(0, 7)))];
+        // The newest month first, so it is in view at the top left however far back the calendar reaches.
+        const months = [...new Set(days.map(({ date }) => date.slice(0, 7)))].reverse();
         const weekdays = Array.from({ length: 7 }, (_, index) =>
             new Intl.DateTimeFormat(this.language(), { weekday: "narrow", timeZone: "UTC" }).format(new Date(Date.UTC(2024, 0, 1 + index))),
         );
@@ -586,7 +580,7 @@ export class ResmedMyairSleepCard extends LitElement {
                     ${months.map((month) => {
                         const first = `${month}-01`;
                         const length = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 0)).getUTCDate();
-                        // The first month starts at the week of the window's first day, not with weeks of empty days.
+                        // The oldest month starts at the week of the window's first day, not with weeks of empty days.
                         const weekday = (date: string) => (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
                         const shown = days[0] && days[0].date > first ? addDays(days[0].date, -weekday(days[0].date)) : first;
                         const from = shown < first ? first : shown;

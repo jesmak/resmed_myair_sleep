@@ -5,8 +5,8 @@ temperature and humidity over the night's session.
 
 [![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![Downloads][downloads-shield]][releases] [![Marketplace][marketplace-shield]][marketplace] [![License][license-shield]](LICENSE)
 
-<img src="https://raw.githubusercontent.com/jesmak/resmed_myair_sleep/main/docs/images/dashboard-light.png#gh-light-mode-only" width="1280" alt="A dashboard of the sleep card's views. Last night's session from just after midnight to half past six with 94 points, AHI 3.8, 6 h 27 min of use and the bedroom at 20.5 °C. The nights since July as AHI bars under a purple line of the bedroom's temperature, cooling into autumn. Half a year of AHI, usage, leak and the score as four small charts. The calendar of July to October coloured by AHI, with 77 % of the last 30 nights kept. The average AHI rising from 2.7 to 4.1 as the bedroom warms from 20 to 24 °C">
-<img src="https://raw.githubusercontent.com/jesmak/resmed_myair_sleep/main/docs/images/dashboard-dark.png#gh-dark-mode-only" width="1280" alt="A dashboard of the sleep card's views. Last night's session from just after midnight to half past six with 94 points, AHI 3.8, 6 h 27 min of use and the bedroom at 20.5 °C. The nights since July as AHI bars under a purple line of the bedroom's temperature, cooling into autumn. Half a year of AHI, usage, leak and the score as four small charts. The calendar of July to October coloured by AHI, with 77 % of the last 30 nights kept. The average AHI rising from 2.7 to 4.1 as the bedroom warms from 20 to 24 °C">
+<img src="https://raw.githubusercontent.com/jesmak/resmed_myair_sleep/main/docs/images/dashboard-light.png#gh-light-mode-only" width="1280" alt="A dashboard of the sleep card's views. Last night's session from just after midnight to half past six with 94 points, AHI 3.8, 6 h 27 min of use and the bedroom at 20.5 °C. The nights since July as AHI bars under a purple line of the bedroom's temperature, cooling into autumn. Half a year of AHI, usage, leak and the score as four small charts. The calendar of October back to July coloured by AHI, with 77 % of the last 30 nights kept. The average AHI rising from 2.7 to 4.1 as the bedroom warms from 20 to 24 °C">
+<img src="https://raw.githubusercontent.com/jesmak/resmed_myair_sleep/main/docs/images/dashboard-dark.png#gh-dark-mode-only" width="1280" alt="A dashboard of the sleep card's views. Last night's session from just after midnight to half past six with 94 points, AHI 3.8, 6 h 27 min of use and the bedroom at 20.5 °C. The nights since July as AHI bars under a purple line of the bedroom's temperature, cooling into autumn. Half a year of AHI, usage, leak and the score as four small charts. The calendar of October back to July coloured by AHI, with 77 % of the last 30 nights kept. The average AHI rising from 2.7 to 4.1 as the bedroom warms from 20 to 24 °C">
 
 ## What is it?
 
@@ -153,7 +153,7 @@ The integration comes with a dashboard card for one machine, with three views to
   temperature and humidity. A dot beside AHI, usage and leak tells whether the value is within its limit.
 - **The nights** shows the nights of the last `days` days. They can be drawn as bars of one
   figure, with a line of the bedroom's temperature or humidity over them, as four small charts of AHI, usage, leak and
-  the score, or as a calendar coloured by one figure, with the 30-day compliance at the top.
+  the score, or as a calendar coloured by one figure, its newest month first, with the 30-day compliance at the top.
 - **Sleep and the room** shows how AHI goes with the bedroom's temperature or humidity over the nights that have them.
   It can be drawn as the average AHI for each degree or each 5 % of humidity, or as a dot for each night, coloured by
   its mask leak.
@@ -204,7 +204,7 @@ a chart gets beyond its own height first widens its gaps to the parts above and 
 chart grows by the rest. The same goes for a card held taller than its content.
 
 Held lower than its content needs, a chart shrinks down to 90 px, and the small charts down to 40 px each. The rows of
-last night, the room's ranges and the calendar scroll instead, and the calendar opens on its newest month. Each view
+last night, the room's ranges and the calendar scroll instead. Each view
 has its least height, which the card doesn't go below.
 
 ## Examples
