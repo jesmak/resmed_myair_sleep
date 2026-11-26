@@ -254,7 +254,9 @@ by its language code, such as `en.json` and `fi.json`. To add a language, copy `
 and translate the values.
 
 The card's texts are in `frontend/src/localize/languages/`, in the same way. The card finds a new file by itself and
-uses it when Home Assistant is set to that language. A text left out falls back to English.
+uses it when Home Assistant is set to that language. A text left out falls back to English. A file may name a
+region, such as `pt-br.json`. It is used for `pt-BR`, falling back to a file for the language alone (`pt.json`), and
+then to English.
 
 ## Development
 
