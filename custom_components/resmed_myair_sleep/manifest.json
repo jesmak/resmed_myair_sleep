@@ -1,6 +1,7 @@
 {
   "domain": "resmed_myair_sleep",
   "name": "ResMed myAir Sleep",
+  "categories": ["health_wellbeing"],
   "codeowners": ["@jesmak"],
   "config_flow": true,
   "dependencies": ["http", "lovelace", "recorder", "websocket_api"],
