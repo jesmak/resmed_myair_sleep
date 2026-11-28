@@ -292,6 +292,12 @@ commit whose built card doesn't match `frontend/`, run `git config core.hooksPat
 | `frontend/src/`                                       | The card: its views, charts, data, editor and texts                                         |
 | `tests/`                                              | Tests, run with pytest and a mocked myAir                                                   |
 
+## Contributing
+
+Pull requests are welcome. Open them against the `dev` branch, where the work for the next release is collected.
+`main` holds the latest release and moves only when a new one is made, so this README always describes the released
+version.
+
 ## Support
 
 Hey dude! Help me out for a couple of :beers: or a :coffee:!
